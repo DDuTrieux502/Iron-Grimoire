@@ -1,20 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0a0a0f" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Iron Grimoire</title>
-    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #0a0a0f; font-family: 'Crimson Text', serif; -webkit-font-smoothing: antialiased; }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./src/main.jsx"></script>
-  </body>
-</html>
+# Iron Grimoire
+
+A gamified workout, habit, and meditation tracker with Solo Leveling-inspired progression.
+
+## Features
+- **Password-protected profiles** — SHA-256 hashed, per-profile auth
+- **Iron** — Weightlifting tracker with exercise demos, PR tracking, rest timer
+- **Discipline** — Habit tracker with dot calendar, streaks, custom + preset habits
+- **Mind** — Meditation timer with journal, breathing animation
+- **3 separate XP pools** with 90 levels each (E-Rank → Monarch)
+- **75 achievements** across Iron, Discipline, Mind, and Cross-Pillar
+- **Daily & weekly quests** with live progress tracking
+- **Prestige system** — Ascend at max rank for permanent XP multiplier
+- **Multi-profile** — Separate password-protected accounts per device
+
+## Deploy to Vercel (Easiest — Free)
+
+1. Push this folder to a GitHub repo
+2. Go to [vercel.com](https://vercel.com) and sign in with GitHub
+3. Click "New Project" → Import your repo
+4. Vercel auto-detects Vite — just click **Deploy**
+5. Done. You get a URL like `iron-grimoire.vercel.app`
+
+## Run Locally
+
+```bash
+npm install
+npm run dev
+```
+
+Opens at `http://localhost:5173`
+
+## Build for Production
+
+```bash
+npm run build
+```
+
+Output goes to `dist/` folder — can be hosted anywhere static.
