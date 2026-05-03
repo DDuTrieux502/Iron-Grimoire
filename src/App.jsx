@@ -262,6 +262,40 @@ function generateStrideRanks() {
 const STRIDE_RANKS = generateStrideRanks();
 
 // ═══════════════════════════════════════════════════════════════
+// LORE (READING)
+// ═══════════════════════════════════════════════════════════════
+
+const SHELVES = [
+  { id: "reading", name: "Currently Reading", icon: "📖" },
+  { id: "want", name: "Want to Read", icon: "📚" },
+  { id: "finished", name: "Finished", icon: "✦" },
+];
+
+const LORE_TIERS = [
+  { rank: "E", name: "Apprentice",   emblem: "📖", color: "#6b6252", xpPerLvl: 100 },
+  { rank: "D", name: "Scholar",      emblem: "📚", color: "#8b7a5e", xpPerLvl: 200 },
+  { rank: "C", name: "Sage",         emblem: "✦",  color: "#a0c49c", xpPerLvl: 400 },
+  { rank: "B", name: "Loremaster",   emblem: "📜", color: "#9cb4c4", xpPerLvl: 700 },
+  { rank: "A", name: "Archivist",    emblem: "🗝", color: "#c4a96a", xpPerLvl: 1200 },
+  { rank: "S", name: "Oracle",       emblem: "🔮", color: "#d4b87a", xpPerLvl: 2000 },
+  { rank: "SS", name: "Mystic",      emblem: "✴",  color: "#e8cb8c", xpPerLvl: 3500 },
+  { rank: "SSS", name: "Grimoire",   emblem: "♾",  color: "#b89cc4", xpPerLvl: 6000 },
+  { rank: "M", name: "Aetherborn",   emblem: "✺",  color: "#d4a4a4", xpPerLvl: 10000 },
+];
+
+function generateLoreRanks() {
+  const levels = []; let cumXP = 0; let lvl = 1;
+  LORE_TIERS.forEach(tier => {
+    for (let i = 1; i <= 10; i++) {
+      levels.push({ level: lvl++, tier: tier.rank, tierName: tier.name, emblem: tier.emblem, color: tier.color, xp: cumXP, subLevel: i });
+      cumXP += tier.xpPerLvl;
+    }
+  });
+  return levels;
+}
+const LORE_RANKS = generateLoreRanks();
+
+// ═══════════════════════════════════════════════════════════════
 // ACHIEVEMENTS (75 total)
 // ═══════════════════════════════════════════════════════════════
 
@@ -381,6 +415,21 @@ const ACHIEVEMENTS = [
   { id: "stride_streak_7", cat: "stride", name: "Week of Running", desc: "7 days in a row with a run", icon: "⚡", check: s => s.runStreak >= 7 },
   { id: "stride_dawn", cat: "stride", name: "Morning Runner", desc: "10 runs before 7am", icon: "🌅", check: s => s.dawnRuns >= 10 },
   { id: "stride_weather", cat: "stride", name: "Tempered Runner", desc: "Run in 5 different weather conditions", icon: "🌦", check: s => s.weatherVariety >= 5 },
+
+  // Lore (Reading)
+  { id: "lore_first", cat: "lore", name: "First Tome", desc: "Add your first book", icon: "📖", check: s => s.totalBooks >= 1 },
+  { id: "lore_finish_1", cat: "lore", name: "Cover to Cover", desc: "Finish your first book", icon: "✦", check: s => s.booksFinished >= 1 },
+  { id: "lore_finish_5", cat: "lore", name: "Devoted Reader", desc: "Finish 5 books", icon: "📚", check: s => s.booksFinished >= 5 },
+  { id: "lore_finish_25", cat: "lore", name: "Bibliophile", desc: "Finish 25 books", icon: "🗝", check: s => s.booksFinished >= 25 },
+  { id: "lore_finish_100", cat: "lore", name: "Centurion of Lore", desc: "Finish 100 books", icon: "♾", check: s => s.booksFinished >= 100 },
+  { id: "lore_pages_100", cat: "lore", name: "First Hundred", desc: "Read 100 total pages", icon: "📜", check: s => s.totalPagesRead >= 100 },
+  { id: "lore_pages_1000", cat: "lore", name: "Thousand Pages", desc: "Read 1,000 total pages", icon: "📜", check: s => s.totalPagesRead >= 1000 },
+  { id: "lore_pages_10000", cat: "lore", name: "Vault of Ten Thousand", desc: "Read 10,000 total pages", icon: "🏛", check: s => s.totalPagesRead >= 10000 },
+  { id: "lore_streak_7", cat: "lore", name: "Week of Wisdom", desc: "Read 7 days in a row", icon: "🔥", check: s => s.readingStreak >= 7 },
+  { id: "lore_streak_30", cat: "lore", name: "Lunar Cycle", desc: "Read 30 days in a row", icon: "🌙", check: s => s.readingStreak >= 30 },
+  { id: "lore_marathon", cat: "lore", name: "Marathon Reader", desc: "Read for 60+ minutes in one session", icon: "⏳", check: s => s.longestReadSession >= 60 },
+  { id: "lore_quotes_10", cat: "lore", name: "Wordsmith", desc: "Save 10 favorite quotes", icon: "✒", check: s => s.totalQuotes >= 10 },
+  { id: "lore_5_star", cat: "lore", name: "Masterwork", desc: "Rate a book 5 stars", icon: "⭐", check: s => s.fiveStarBooks >= 1 },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -529,7 +578,7 @@ function calcWeekStreak(history) {
   return streak;
 }
 
-function computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated, bodyLog = [], runs = [], activeProgram = null }) {
+function computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated, bodyLog = [], runs = [], activeProgram = null, books = [], readingSessions = [] }) {
   // Iron stats
   const totalSessions = history.length;
   let bestVolume = 0, totalVolume = 0, totalSetsCompleted = 0;
@@ -610,6 +659,18 @@ function computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, 
   const c25kComplete = activeProgram?.id === "c25k" && activeProgram?.completed;
   const programsCompleted = (activeProgram?.completedPrograms || []).length;
 
+  // Lore stats
+  const totalBooks = books.length;
+  const booksFinished = books.filter(b => b.shelf === "finished").length;
+  const totalPagesRead = readingSessions.reduce((s,r) => s + (parseInt(r.pages)||0), 0);
+  const longestReadSession = readingSessions.reduce((m,r) => Math.max(m, parseInt(r.minutes)||0), 0);
+  const totalQuotes = books.reduce((s,b) => s + ((b.quotes && b.quotes.length) || 0), 0);
+  const fiveStarBooks = books.filter(b => b.rating === 5).length;
+  // Reading streak (consecutive days with a session)
+  const readDates = new Set(readingSessions.map(r => dateKey(new Date(r.date))));
+  let readingStreak = 0; const rrd = new Date();
+  while (true) { const k = dateKey(rrd); if (readDates.has(k)) { readingStreak++; rrd.setDate(rrd.getDate()-1); } else break; if (readingStreak > 500) break; }
+
   // Cross
   const trinityDateSet = new Set();
   const sessionDates = new Set(history.map(h => dateKey(new Date(h.date))));
@@ -624,7 +685,7 @@ function computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, 
   const maxAnyLevel = Math.max(ironLvl, discLvl, mindLvl);
   const minAnyLevel = Math.min(ironLvl, discLvl, mindLvl);
 
-  return { totalSessions, bestVolume, totalVolume, totalSetsCompleted, dawnSessions, nightSessions, hadPerfectSession, daysCompleted, bestMonthlySessions, weekStreak, prs, totalHabitCompletions, longestHabitStreak, habitTotals, bestHabitsInDay, activeHabits, presetsAdded, customHabitsCreated, totalMeditations, longestMeditation, totalMedMinutes, medJournalCount, medStreak, trinityDays, maxAnyLevel, minAnyLevel, questsCompleted, ascensions, bodyLogCount, bodyFullEntryCount, bodyWeeklyStreak, totalRuns, totalMiles, longestRun, dawnRuns, weatherVariety, runStreak, c25kComplete, programsCompleted };
+  return { totalSessions, bestVolume, totalVolume, totalSetsCompleted, dawnSessions, nightSessions, hadPerfectSession, daysCompleted, bestMonthlySessions, weekStreak, prs, totalHabitCompletions, longestHabitStreak, habitTotals, bestHabitsInDay, activeHabits, presetsAdded, customHabitsCreated, totalMeditations, longestMeditation, totalMedMinutes, medJournalCount, medStreak, trinityDays, maxAnyLevel, minAnyLevel, questsCompleted, ascensions, bodyLogCount, bodyFullEntryCount, bodyWeeklyStreak, totalRuns, totalMiles, longestRun, dawnRuns, weatherVariety, runStreak, c25kComplete, programsCompleted, totalBooks, booksFinished, totalPagesRead, longestReadSession, totalQuotes, fiveStarBooks, readingStreak };
 }
 
 function pickRandom(arr, n, exclude = []) {
@@ -697,6 +758,285 @@ function getQuestTarget(q, habits) {
 // ═══════════════════════════════════════════════════════════════
 // SVG DIAGRAMS (same as before)
 // ═══════════════════════════════════════════════════════════════
+
+function LoreHome({ rank, xp, books, readingSessions, onBack, onAddBook, onOpenBook, onLogSession, onRanks, onLibrary }) {
+  const reading = books.filter(b => b.shelf === "reading");
+  const finished = books.filter(b => b.shelf === "finished");
+  const want = books.filter(b => b.shelf === "want");
+  const totalPages = readingSessions.reduce((s,r) => s + (parseInt(r.pages)||0), 0);
+  const totalMinutes = readingSessions.reduce((s,r) => s + (parseInt(r.minutes)||0), 0);
+  const tk = todayKey();
+  const sessionsToday = readingSessions.filter(r => dateKey(new Date(r.date)) === tk).length;
+
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>📖 Lore</h2></div>
+      <RankCard rank={rank} xp={xp} pillar="lore"/>
+
+      <div style={S.loreQuickStats}>
+        <div style={S.loreStatBox}><span style={{...S.loreStatVal,color:"#b48cc8"}}>{finished.length}</span><span style={S.loreStatLbl}>Finished</span></div>
+        <div style={S.loreStatBox}><span style={{...S.loreStatVal,color:"#b48cc8"}}>{totalPages.toLocaleString()}</span><span style={S.loreStatLbl}>Pages</span></div>
+        <div style={S.loreStatBox}><span style={{...S.loreStatVal,color:"#b48cc8"}}>{Math.round(totalMinutes/60)}</span><span style={S.loreStatLbl}>Hours</span></div>
+      </div>
+
+      <div style={S.dv}>━━━ ◈ ━━━</div>
+
+      {reading.length > 0 ? (
+        <>
+          <div style={S.sectionHead}>Currently Reading</div>
+          <div style={S.bookList}>{reading.map(b => (
+            <button key={b.id} style={S.bookRow} onClick={()=>onOpenBook(b.id)}>
+              {b.coverUrl ? <img src={b.coverUrl} style={S.bookCoverThumb} alt=""/> : <div style={S.bookCoverPlaceholder}>📖</div>}
+              <div style={{flex:1,textAlign:"left",overflow:"hidden"}}>
+                <span style={S.bookTitle}>{b.title}</span>
+                <span style={S.bookAuthor}>{b.author}</span>
+                {b.pages && <div style={S.bookProgressBar}><div style={{...S.bookProgressFill, width: `${Math.min(100, ((b.currentPage||0) / b.pages) * 100)}%`}}/></div>}
+                {b.pages && <span style={S.bookProgressTxt}>{b.currentPage || 0} / {b.pages} pages</span>}
+              </div>
+              <span style={S.dArr}>▸</span>
+            </button>
+          ))}</div>
+        </>
+      ) : (
+        <p style={S.emp}>Nothing in your tome — add a book to begin.</p>
+      )}
+
+      <button style={{...S.finB,background:"linear-gradient(135deg,rgba(140,110,160,0.15),rgba(180,140,200,0.1))",borderColor:"rgba(180,140,200,0.35)",color:"#b48cc8",marginTop:"12px"}} onClick={onLogSession}>📖 Log Reading Session</button>
+      <button style={{...S.finB,background:"none",border:"1px dashed rgba(180,140,200,0.3)",color:"#b48cc8",marginTop:"4px"}} onClick={onAddBook}>+ Add a Book</button>
+
+      <div style={S.navR}>
+        <button style={S.navB} onClick={onLibrary}>📚 Library</button>
+        <button style={S.navB} onClick={onRanks}>◈ Ranks</button>
+      </div>
+    </div>
+  );
+}
+
+function LoreLibraryView({ books, onBack, onOpenBook, onAddBook }) {
+  const [activeShelf, setActiveShelf] = useState("reading");
+  const filtered = books.filter(b => b.shelf === activeShelf);
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>📚 Library</h2></div>
+      <div style={S.shelfTabs}>{SHELVES.map(s => (
+        <button key={s.id} style={{...S.shelfTab, ...(activeShelf === s.id ? S.shelfTabActive : {})}} onClick={()=>setActiveShelf(s.id)}>
+          <span>{s.icon}</span><span style={S.shelfTabName}>{s.name}</span>
+          <span style={S.shelfTabCount}>{books.filter(b => b.shelf === s.id).length}</span>
+        </button>
+      ))}</div>
+      {filtered.length === 0 ? <p style={S.emp}>No books on this shelf yet.</p> : (
+        <div style={S.bookList}>{filtered.map(b => (
+          <button key={b.id} style={S.bookRow} onClick={()=>onOpenBook(b.id)}>
+            {b.coverUrl ? <img src={b.coverUrl} style={S.bookCoverThumb} alt=""/> : <div style={S.bookCoverPlaceholder}>📖</div>}
+            <div style={{flex:1,textAlign:"left",overflow:"hidden"}}>
+              <span style={S.bookTitle}>{b.title}</span>
+              <span style={S.bookAuthor}>{b.author}</span>
+              {b.shelf === "finished" && b.rating > 0 && <span style={S.bookRatingMini}>{"★".repeat(b.rating)}{"☆".repeat(5-b.rating)}</span>}
+            </div>
+            <span style={S.dArr}>▸</span>
+          </button>
+        ))}</div>
+      )}
+      <button style={{...S.finB,background:"none",border:"1px dashed rgba(180,140,200,0.3)",color:"#b48cc8",marginTop:"12px"}} onClick={onAddBook}>+ Add a Book</button>
+    </div>
+  );
+}
+
+function LoreBookEditView({ book, onSave, onBack }) {
+  const [title, setTitle] = useState(book?.title || "");
+  const [author, setAuthor] = useState(book?.author || "");
+  const [pages, setPages] = useState(book?.pages ? String(book.pages) : "");
+  const [coverUrl, setCoverUrl] = useState(book?.coverUrl || "");
+  const [shelf, setShelf] = useState(book?.shelf || "want");
+
+  const handleSave = () => {
+    if (!title.trim()) { alert("Title required."); return; }
+    onSave({
+      title: title.trim(),
+      author: author.trim(),
+      pages: pages ? parseInt(pages) : null,
+      coverUrl: coverUrl.trim(),
+      shelf,
+    });
+  };
+
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>{book ? "Edit Book" : "Add Book"}</h2></div>
+      <div style={S.sectionHead}>Title *</div>
+      <input style={{...S.authInput,textAlign:"left"}} placeholder="Book title" value={title} onChange={e=>setTitle(e.target.value)}/>
+      <div style={S.sectionHead}>Author</div>
+      <input style={{...S.authInput,textAlign:"left"}} placeholder="Author" value={author} onChange={e=>setAuthor(e.target.value)}/>
+      <div style={S.sectionHead}>Total Pages</div>
+      <input style={{...S.authInput,textAlign:"left"}} type="number" inputMode="numeric" placeholder="Optional" value={pages} onChange={e=>setPages(e.target.value)}/>
+      <div style={S.sectionHead}>Cover Image URL (optional)</div>
+      <input style={{...S.authInput,textAlign:"left",fontSize:"13px"}} placeholder="https://..." value={coverUrl} onChange={e=>setCoverUrl(e.target.value)}/>
+      {coverUrl && <div style={S.coverPreviewBox}><img src={coverUrl} style={S.coverPreview} alt="" onError={e=>e.target.style.display="none"}/></div>}
+      <div style={S.sectionHead}>Shelf</div>
+      <div style={S.shelfPickerRow}>{SHELVES.map(s => (
+        <button key={s.id} style={{...S.shelfPickerBtn, ...(shelf === s.id ? S.shelfPickerBtnActive : {})}} onClick={()=>setShelf(s.id)}>
+          <span>{s.icon}</span><span style={S.shelfPickerName}>{s.name}</span>
+        </button>
+      ))}</div>
+      <button style={{...S.finB,background:"linear-gradient(135deg,rgba(140,110,160,0.15),rgba(180,140,200,0.1))",borderColor:"rgba(180,140,200,0.35)",color:"#b48cc8",marginTop:"16px"}} onClick={handleSave}>◆ {book ? "Save Changes" : "Add Book"} ◆</button>
+      <button style={S.hmB} onClick={onBack}>Cancel</button>
+    </div>
+  );
+}
+
+function LoreBookDetailView({ book, sessions, onBack, onEdit, onMove, onDelete, onLogSession, onFinish }) {
+  const [showQuoteAdd, setShowQuoteAdd] = useState(false);
+  const [newQuote, setNewQuote] = useState("");
+  const totalRead = sessions.reduce((s,r) => s + (parseInt(r.pages)||0), 0);
+  const totalMin = sessions.reduce((s,r) => s + (parseInt(r.minutes)||0), 0);
+  const progressPct = book.pages ? Math.min(100, ((book.currentPage||0) / book.pages) * 100) : 0;
+
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={{...S.wT,flex:1}}>📖 Book</h2><button style={S.gearBtn} onClick={onEdit}>✎</button></div>
+
+      <div style={S.bookDetailHero}>
+        {book.coverUrl ? <img src={book.coverUrl} style={S.bookCoverLarge} alt=""/> : <div style={S.bookCoverLargePlaceholder}>📖</div>}
+        <div style={{flex:1}}>
+          <span style={S.bookDetailTitle}>{book.title}</span>
+          {book.author && <span style={S.bookDetailAuthor}>by {book.author}</span>}
+          <span style={S.bookDetailShelf}>{SHELVES.find(s => s.id === book.shelf)?.icon} {SHELVES.find(s => s.id === book.shelf)?.name}</span>
+          {book.rating > 0 && <span style={S.bookDetailRating}>{"★".repeat(book.rating)}{"☆".repeat(5-book.rating)}</span>}
+        </div>
+      </div>
+
+      {book.pages > 0 && (
+        <div style={S.bookFullProgressBox}>
+          <div style={S.bookFullProgressBar}><div style={{...S.bookFullProgressFill, width:`${progressPct}%`}}/></div>
+          <span style={S.bookProgressTxt}>{book.currentPage || 0} / {book.pages} pages · {Math.round(progressPct)}%</span>
+        </div>
+      )}
+
+      <div style={S.bookStatsRow}>
+        <div style={S.bookStatBox}><span style={S.bookStatVal}>{sessions.length}</span><span style={S.bookStatLbl}>Sessions</span></div>
+        <div style={S.bookStatBox}><span style={S.bookStatVal}>{totalRead}</span><span style={S.bookStatLbl}>Pages</span></div>
+        <div style={S.bookStatBox}><span style={S.bookStatVal}>{totalMin}</span><span style={S.bookStatLbl}>Minutes</span></div>
+      </div>
+
+      {book.shelf !== "finished" && <>
+        <button style={{...S.finB,background:"linear-gradient(135deg,rgba(140,110,160,0.15),rgba(180,140,200,0.1))",borderColor:"rgba(180,140,200,0.35)",color:"#b48cc8"}} onClick={onLogSession}>📖 Log Session</button>
+        <button style={{...S.finB,background:"linear-gradient(135deg,rgba(196,169,106,0.15),rgba(232,203,140,0.1))",borderColor:"rgba(232,203,140,0.35)",color:"#e8cb8c",marginTop:"4px"}} onClick={onFinish}>✦ Mark as Finished ✦</button>
+      </>}
+
+      <div style={S.sectionHead}>Move to Shelf</div>
+      <div style={S.shelfPickerRow}>{SHELVES.map(s => (
+        <button key={s.id} style={{...S.shelfPickerBtn, ...(book.shelf === s.id ? S.shelfPickerBtnActive : {})}} onClick={()=>onMove(s.id)} disabled={book.shelf === s.id}>
+          <span>{s.icon}</span><span style={S.shelfPickerName}>{s.name}</span>
+        </button>
+      ))}</div>
+
+      {book.notes && <>
+        <div style={S.sectionHead}>Notes</div>
+        <p style={S.bookNotesDisplay}>{book.notes}</p>
+      </>}
+
+      {book.quotes && book.quotes.length > 0 && <>
+        <div style={S.sectionHead}>Favorite Quotes</div>
+        <div style={S.quoteList}>{book.quotes.map((q, i) => (
+          <div key={i} style={S.quoteCard}><span style={S.quoteMark}>"</span><span style={S.quoteText}>{q}</span></div>
+        ))}</div>
+      </>}
+
+      <button style={{...S.clr,marginTop:"24px"}} onClick={onDelete}>Delete Book</button>
+    </div>
+  );
+}
+
+function LoreLogSessionView({ books, preselectedBookId, onSave, onBack }) {
+  const [bookId, setBookId] = useState(preselectedBookId || (books[0]?.id || ""));
+  const [pages, setPages] = useState("");
+  const [minutes, setMinutes] = useState("");
+
+  const canSave = bookId && (parseInt(pages) > 0 || parseInt(minutes) > 0);
+
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>📖 Log Session</h2></div>
+
+      {books.length === 0 ? <p style={S.emp}>Add a book first to log a session.</p> : <>
+        <div style={S.sectionHead}>Book</div>
+        <div style={S.bookSelectList}>{books.map(b => (
+          <button key={b.id} style={{...S.bookSelectRow, ...(bookId === b.id ? S.bookSelectRowActive : {})}} onClick={()=>setBookId(b.id)}>
+            <span style={S.bookSelectTitle}>{b.title}</span>
+            {b.author && <span style={S.bookSelectAuthor}>{b.author}</span>}
+          </button>
+        ))}</div>
+
+        <div style={S.sectionHead}>How much did you read?</div>
+        <div style={S.runMetricRow}>
+          <div style={S.runMetricCol}>
+            <input style={S.runMetricInput} type="number" inputMode="numeric" placeholder="0" value={pages} onChange={e=>setPages(e.target.value)}/>
+            <span style={S.runMetricUnit}>pages</span>
+          </div>
+          <div style={S.runMetricCol}>
+            <input style={S.runMetricInput} type="number" inputMode="numeric" placeholder="0" value={minutes} onChange={e=>setMinutes(e.target.value)}/>
+            <span style={S.runMetricUnit}>minutes</span>
+          </div>
+        </div>
+        <p style={S.shareHint}>Either or both — XP earned for both.</p>
+
+        <button style={{...S.finB,background:"linear-gradient(135deg,rgba(140,110,160,0.15),rgba(180,140,200,0.1))",borderColor:"rgba(180,140,200,0.35)",color:"#b48cc8",opacity: canSave ? 1 : 0.4}} onClick={()=>canSave && onSave(bookId, pages, minutes)} disabled={!canSave}>◆ Save Session ◆</button>
+        <button style={S.hmB} onClick={onBack}>Cancel</button>
+      </>}
+    </div>
+  );
+}
+
+function LoreFinishBookView({ book, onSave, onBack }) {
+  const [rating, setRating] = useState(book.rating || 0);
+  const [notes, setNotes] = useState(book.notes || "");
+  const [quotes, setQuotes] = useState(book.quotes || []);
+  const [newQuote, setNewQuote] = useState("");
+
+  const addQuote = () => {
+    if (!newQuote.trim()) return;
+    setQuotes([...quotes, newQuote.trim()]);
+    setNewQuote("");
+  };
+  const removeQuote = (idx) => setQuotes(quotes.filter((_, i) => i !== idx));
+
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>✦ Finish Book</h2></div>
+      <p style={S.chronicleSubtitle}>{book.title}</p>
+
+      <div style={S.sectionHead}>Rating</div>
+      <div style={S.starRow}>{[1,2,3,4,5].map(n => (
+        <button key={n} style={{...S.starBtn, color: n <= rating ? "#e8cb8c" : "#4a4236"}} onClick={()=>setRating(n)}>★</button>
+      ))}</div>
+
+      <div style={S.sectionHead}>Notes</div>
+      <textarea style={{...S.journalArea,minHeight:"100px"}} placeholder="What did you think? Key takeaways..." value={notes} onChange={e=>setNotes(e.target.value)}/>
+
+      <div style={S.sectionHead}>Favorite Quotes</div>
+      {quotes.length > 0 && <div style={S.quoteList}>{quotes.map((q, i) => (
+        <div key={i} style={{...S.quoteCard, position:"relative"}}>
+          <span style={S.quoteMark}>"</span>
+          <span style={S.quoteText}>{q}</span>
+          <button style={S.quoteRemove} onClick={()=>removeQuote(i)}>✕</button>
+        </div>
+      ))}</div>}
+      <div style={S.settingsAddRow}>
+        <input style={{...S.authInput,flex:1,textAlign:"left"}} placeholder="Add a quote..." value={newQuote} onChange={e=>setNewQuote(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addQuote()}/>
+        <button style={S.settingsAddBtn} onClick={addQuote}>+</button>
+      </div>
+
+      <button style={{...S.finB,background:"linear-gradient(135deg,rgba(196,169,106,0.15),rgba(232,203,140,0.1))",borderColor:"rgba(232,203,140,0.35)",color:"#e8cb8c",marginTop:"16px"}} onClick={()=>onSave(rating, notes, quotes)}>✦ Mark Finished ✦</button>
+      <button style={S.hmB} onClick={onBack}>Cancel</button>
+    </div>
+  );
+}
 
 function ProgressionChart({ history, exerciseId, pr }) {
   const exHistory = [];
@@ -787,6 +1127,10 @@ export default function App() {
   const [runs, setRuns] = useState([]);
   const [strideXP, setStrideXP] = useState(0);
   const [activeProgram, setActiveProgram] = useState(null); // { id, startedAt, currentWorkoutIndex, completedWorkouts: [], completedPrograms: [] }
+  // Lore state
+  const [books, setBooks] = useState([]); // [{id, title, author, pages, coverUrl, shelf, addedDate, finishedDate, rating, notes, quotes, currentPage}]
+  const [readingSessions, setReadingSessions] = useState([]); // [{id, bookId, date, pages, minutes}]
+  const [loreXP, setLoreXP] = useState(0);
   const [history, setHistory] = useState([]);
   const [lastWeights, setLastWeights] = useState({});
   const [prs, setPrs] = useState({});
@@ -812,6 +1156,7 @@ export default function App() {
   const [earnedPillar, setEarnedPillar] = useState("iron");
   const [ironLeveledUp, setIronLeveledUp] = useState(false);
   const [activeExercise, setActiveExercise] = useState(null);
+  const [activeBookId, setActiveBookId] = useState(null);
   const [newAchievements, setNewAchievements] = useState([]);
   const [completedQuestsThisAction, setCompletedQuestsThisAction] = useState([]);
 
@@ -840,7 +1185,7 @@ export default function App() {
 
   // Load user data
   useEffect(() => { if (!user) return; (async () => {
-    const [h, lw, pr, ix, dx, mx, hb, hl, md, ua, dq, wq, qc, asc, chc, cw, cmt, cmdp, bl, tm, lf, rn, sx, ap] = await Promise.all([
+    const [h, lw, pr, ix, dx, mx, hb, hl, md, ua, dq, wq, qc, asc, chc, cw, cmt, cmdp, bl, tm, lf, rn, sx, ap, bk, rs, lxp] = await Promise.all([
       load(user, "history", []), load(user, "lastWeights", {}), load(user, "prs", {}),
       load(user, "ironXP", 0), load(user, "discXP", 0), load(user, "mindXP", 0),
       load(user, "habits", PRESET_HABITS.slice(0,3)), load(user, "habitLog", {}),
@@ -857,6 +1202,9 @@ export default function App() {
       load(user, "runs", []),
       load(user, "strideXP", 0),
       load(user, "activeProgram", null),
+      load(user, "books", []),
+      load(user, "readingSessions", []),
+      load(user, "loreXP", 0),
     ]);
     setHistory(h); setLastWeights(lw); setPrs(pr);
     setIronXP(ix); setDiscXP(dx); setMindXP(mx);
@@ -866,6 +1214,7 @@ export default function App() {
     setWorkouts(cw); setMedTypes(cmt); setMedDurationPresets(cmdp);
     setBodyLog(bl); setTrackedMetrics(tm); setLogFrequency(lf);
     setRuns(rn); setStrideXP(sx); setActiveProgram(ap);
+    setBooks(bk); setReadingSessions(rs); setLoreXP(lxp);
     // Generate quests if needed
     refreshQuests(dq, wq);
     // Check for unseen monthly chronicle
@@ -1038,7 +1387,7 @@ export default function App() {
     setIronLeveledUp(nl.current.level > prevRank.current.level);
     await Promise.all([save(user,"history",nh), save(user,"lastWeights",nw), save(user,"prs",nPrs), save(user,"ironXP",nxp)]);
     const { newIronXP, newDiscXP, newMindXP, newQC } = await checkAndAwardQuests(nh, habitLog, meditations);
-    const stats = computeAllStats({ history: nh, habits, habitLog, meditations, prs: nPrs, ironXP: newIronXP, discXP: newDiscXP, mindXP: newMindXP, questsCompleted: newQC, ascensions, customHabitsCreated, bodyLog });
+    const stats = computeAllStats({ history: nh, habits, habitLog, meditations, prs: nPrs, ironXP: newIronXP, discXP: newDiscXP, mindXP: newMindXP, questsCompleted: newQC, ascensions, customHabitsCreated, bodyLog, books, readingSessions });
     await checkAchievements(stats);
     setView("iron-summary");
   };
@@ -1055,7 +1404,7 @@ export default function App() {
     setDiscXP(newXP);
     await Promise.all([save(user,"habitLog",newLog), save(user,"discXP",newXP)]);
     const { newIronXP, newDiscXP, newMindXP, newQC } = await checkAndAwardQuests(history, newLog, meditations);
-    const stats = computeAllStats({ history, habits, habitLog: newLog, meditations, prs, ironXP: newIronXP, discXP: newDiscXP, mindXP: newMindXP, questsCompleted: newQC, ascensions, customHabitsCreated, bodyLog });
+    const stats = computeAllStats({ history, habits, habitLog: newLog, meditations, prs, ironXP: newIronXP, discXP: newDiscXP, mindXP: newMindXP, questsCompleted: newQC, ascensions, customHabitsCreated, bodyLog, books, readingSessions });
     await checkAchievements(stats);
   };
   const addHabit = async (preset) => {
@@ -1063,7 +1412,7 @@ export default function App() {
     if (preset) { if (habits.find(h=>h.id===preset.id)) return; newHabit = preset; }
     else { if (!newHabitName.trim()) return; newHabit = { id: `custom_${Date.now()}`, name: newHabitName.trim(), icon: newHabitIcon }; setNewHabitName(""); setNewHabitIcon("✦"); nChc++; setCustomHabitsCreated(nChc); await save(user,"customHabitsCreated",nChc); }
     const nh = [...habits, newHabit]; setHabits(nh); await save(user,"habits",nh);
-    const stats = computeAllStats({ history, habits: nh, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated: nChc, bodyLog });
+    const stats = computeAllStats({ history, habits: nh, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated: nChc, bodyLog, books, readingSessions });
     await checkAchievements(stats);
   };
   const removeHabit = async (id) => {
@@ -1083,7 +1432,7 @@ export default function App() {
     setMeditations(nm); setMindXP(nxp); setMedJournal(""); setEarnedXP(xpGain); setEarnedPillar("mind");
     await Promise.all([save(user,"meditations",nm), save(user,"mindXP",nxp)]);
     const { newIronXP, newDiscXP, newMindXP, newQC } = await checkAndAwardQuests(history, habitLog, nm);
-    const stats = computeAllStats({ history, habits, habitLog, meditations: nm, prs, ironXP: newIronXP, discXP: newDiscXP, mindXP: newMindXP, questsCompleted: newQC, ascensions, customHabitsCreated, bodyLog });
+    const stats = computeAllStats({ history, habits, habitLog, meditations: nm, prs, ironXP: newIronXP, discXP: newDiscXP, mindXP: newMindXP, questsCompleted: newQC, ascensions, customHabitsCreated, bodyLog, books, readingSessions });
     await checkAchievements(stats);
     setView("med-summary");
   };
@@ -1135,6 +1484,82 @@ export default function App() {
     setActiveProgram(newProg);
     await save(user, "activeProgram", newProg);
     setView("stride-home");
+  };
+
+  // ─── LORE (READING) ───
+  const saveBook = async (bookData) => {
+    let nb;
+    if (bookData.id) {
+      // Update existing
+      nb = books.map(b => b.id === bookData.id ? { ...b, ...bookData } : b);
+    } else {
+      // New book
+      const newBook = {
+        id: "bk_" + Date.now(),
+        addedDate: new Date().toISOString(),
+        shelf: bookData.shelf || "want",
+        rating: 0,
+        notes: "",
+        quotes: [],
+        currentPage: 0,
+        ...bookData,
+      };
+      nb = [newBook, ...books];
+    }
+    setBooks(nb);
+    await save(user, "books", nb);
+  };
+  const deleteBook = async (bookId) => {
+    if (!confirm("Delete this book and all its sessions?")) return;
+    const nb = books.filter(b => b.id !== bookId);
+    const ns = readingSessions.filter(r => r.bookId !== bookId);
+    setBooks(nb); setReadingSessions(ns);
+    await save(user, "books", nb);
+    await save(user, "readingSessions", ns);
+    setView("lore-home");
+  };
+  const moveBook = async (bookId, newShelf) => {
+    const nb = books.map(b => {
+      if (b.id !== bookId) return b;
+      const updated = { ...b, shelf: newShelf };
+      if (newShelf === "finished" && !b.finishedDate) updated.finishedDate = new Date().toISOString();
+      return updated;
+    });
+    setBooks(nb);
+    await save(user, "books", nb);
+  };
+  const logReadingSession = async (bookId, pages, minutes) => {
+    const p = parseInt(pages) || 0;
+    const m = parseInt(minutes) || 0;
+    if (p <= 0 && m <= 0) return;
+    const session = { id: "rs_" + Date.now(), bookId, date: new Date().toISOString(), pages: p, minutes: m };
+    const ns = [session, ...readingSessions];
+    // Update currentPage on the book
+    const nb = books.map(b => b.id === bookId ? { ...b, currentPage: (b.currentPage || 0) + p } : b);
+    // XP: 10 per page + 1 per minute + 10 base
+    const xpGain = 10 + (p * 10) + m;
+    const nxp = loreXP + xpGain;
+    setReadingSessions(ns); setBooks(nb); setLoreXP(nxp);
+    setEarnedXP(xpGain); setEarnedPillar("lore");
+    await Promise.all([save(user,"readingSessions",ns), save(user,"books",nb), save(user,"loreXP",nxp)]);
+    const stats = computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated, bodyLog, runs, activeProgram, books: nb, readingSessions: ns });
+    await checkAchievements(stats);
+    setView("lore-summary");
+  };
+  const finishBook = async (bookId, rating, notes, quotes) => {
+    const nb = books.map(b => b.id === bookId ? { ...b, shelf: "finished", finishedDate: new Date().toISOString(), rating: rating || b.rating, notes: notes !== undefined ? notes : b.notes, quotes: quotes || b.quotes } : b);
+    // Bonus XP for finishing
+    const finishedBook = nb.find(b => b.id === bookId);
+    const pageBonus = (finishedBook?.pages || 0) * 5;
+    const baseBonus = 200;
+    const xpGain = baseBonus + pageBonus;
+    const nxp = loreXP + xpGain;
+    setBooks(nb); setLoreXP(nxp);
+    setEarnedXP(xpGain); setEarnedPillar("lore");
+    await Promise.all([save(user,"books",nb), save(user,"loreXP",nxp)]);
+    const stats = computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated, bodyLog, runs, activeProgram, books: nb, readingSessions });
+    await checkAchievements(stats);
+    setView("lore-summary");
   };
 
   // ─── BODY TRACKING ───
@@ -1198,6 +1623,7 @@ export default function App() {
   const disc = getRank(discXP, DISC_RANKS);
   const mind = getRank(mindXP, MIND_RANKS);
   const stride = getRank(strideXP, STRIDE_RANKS);
+  const lore = getRank(loreXP, LORE_RANKS);
   const ascMultiplier = 1 + ascensions * 0.1;
   const anyMaxed = iron.current.level >= MAX_LEVEL || disc.current.level >= MAX_LEVEL || mind.current.level >= MAX_LEVEL;
 
@@ -1223,6 +1649,7 @@ export default function App() {
         <PillarCard rank={disc} xp={discXP} pillar="disc" name="Discipline" onClick={()=>setView("disc-home")}/>
         <PillarCard rank={mind} xp={mindXP} pillar="mind" name="Mind" onClick={()=>setView("mind-home")}/>
         <PillarCard rank={stride} xp={strideXP} pillar="stride" name="Stride" onClick={()=>setView("stride-home")}/>
+        <PillarCard rank={lore} xp={loreXP} pillar="lore" name="Lore" onClick={()=>setView("lore-home")}/>
       </div>
 
       <div style={S.dv}>━━━ ◈ ━━━</div>
@@ -1273,7 +1700,7 @@ export default function App() {
         <div style={S.wH}><button style={S.bk} onClick={()=>setView("home")}>‹</button><h2 style={S.wT}>★ Feats of the Path</h2></div>
         <p style={S.aSub}>{unlockedCount} of {filtered.length} unlocked in this category</p>
         <div style={S.fR}>
-          {[["all","All"],["iron","⚔ Iron"],["disc","❂ Disc."],["mind","☯ Mind"],["stride","🏃 Stride"],["cross","✺ Cross"]].map(([f,l])=>(
+          {[["all","All"],["iron","⚔ Iron"],["disc","❂ Disc."],["mind","☯ Mind"],["stride","🏃 Stride"],["lore","📖 Lore"],["cross","✺ Cross"]].map(([f,l])=>(
             <button key={f} style={{...S.fB,...(achievementFilter===f?S.fBA:{})}} onClick={()=>setAchievementFilter(f)}>{l}</button>
           ))}
         </div>
@@ -1537,6 +1964,29 @@ export default function App() {
 
   if (view === "stride-ranks") return <RanksView ranks={STRIDE_RANKS} currentLvl={stride.current.level} currentXP={strideXP} title="🏃 Ranks of Stride" onBack={()=>setView("stride-home")}/>;
 
+  // ═════════════════════════════════════════════════════
+  // LORE VIEWS
+  // ═════════════════════════════════════════════════════
+  if (view === "lore-home") return <LoreHome rank={lore} xp={loreXP} books={books} readingSessions={readingSessions} onBack={()=>setView("home")} onAddBook={()=>setView("lore-add-book")} onOpenBook={(id)=>{setActiveBookId(id);setView("lore-book-detail");}} onLogSession={()=>setView("lore-log-session")} onRanks={()=>setView("lore-ranks")} onLibrary={()=>setView("lore-library")}/>;
+
+  if (view === "lore-library") return <LoreLibraryView books={books} onBack={()=>setView("lore-home")} onOpenBook={(id)=>{setActiveBookId(id);setView("lore-book-detail");}} onAddBook={()=>setView("lore-add-book")}/>;
+
+  if (view === "lore-add-book") return <LoreBookEditView book={null} onSave={async (data)=>{await saveBook(data);setView("lore-home");}} onBack={()=>setView("lore-home")}/>;
+
+  if (view === "lore-edit-book" && activeBookId) { const book = books.find(b => b.id === activeBookId); if (!book) { setView("lore-home"); return null; } return <LoreBookEditView book={book} onSave={async (data)=>{await saveBook({...data, id: activeBookId});setView("lore-book-detail");}} onBack={()=>setView("lore-book-detail")}/>; }
+
+  if (view === "lore-book-detail" && activeBookId) { const book = books.find(b => b.id === activeBookId); if (!book) { setView("lore-home"); return null; } const sessions = readingSessions.filter(r => r.bookId === activeBookId); return <LoreBookDetailView book={book} sessions={sessions} onBack={()=>setView("lore-home")} onEdit={()=>setView("lore-edit-book")} onMove={async (newShelf)=>await moveBook(book.id, newShelf)} onDelete={async ()=>await deleteBook(book.id)} onLogSession={()=>{setView("lore-log-session");}} onFinish={()=>setView("lore-finish-book")}/>; }
+
+  if (view === "lore-log-session") return <LoreLogSessionView books={books.filter(b => b.shelf === "reading" || b.shelf === "want")} preselectedBookId={activeBookId} onSave={logReadingSession} onBack={()=>activeBookId ? setView("lore-book-detail") : setView("lore-home")}/>;
+
+  if (view === "lore-finish-book" && activeBookId) { const book = books.find(b => b.id === activeBookId); if (!book) { setView("lore-home"); return null; } return <LoreFinishBookView book={book} onSave={(rating, notes, quotes)=>finishBook(book.id, rating, notes, quotes)} onBack={()=>setView("lore-book-detail")}/>; }
+
+  if (view === "lore-summary") return (
+    <SummaryView icon="📖" pillar="lore" pillarColor="#b48cc8" title="Wisdom Gained" date={new Date()} earnedXP={earnedXP} xpLabel="Lore XP Earned" xpBreakdown={["Reading session logged"]} onReturn={()=>setView("lore-home")}/>
+  );
+
+  if (view === "lore-ranks") return <RanksView ranks={LORE_RANKS} currentLvl={lore.current.level} currentXP={loreXP} title="📖 Ranks of Lore" onBack={()=>setView("lore-home")}/>;
+
   return null;
 }
 
@@ -1550,6 +2000,7 @@ function PillarCard({ rank, xp, pillar, name, onClick }) {
     disc: { bg: "linear-gradient(135deg,rgba(107,138,106,0.1),rgba(160,196,156,0.05))", border: "rgba(160,196,156,0.2)", bar: "linear-gradient(90deg,#6b8a6a,#a0c49c)", text: "#a0c49c" },
     mind: { bg: "linear-gradient(135deg,rgba(106,122,138,0.1),rgba(156,180,196,0.05))", border: "rgba(156,180,196,0.2)", bar: "linear-gradient(90deg,#6a7a8a,#9cb4c4)", text: "#9cb4c4" },
     stride: { bg: "linear-gradient(135deg,rgba(180,140,120,0.1),rgba(220,180,150,0.05))", border: "rgba(220,180,150,0.2)", bar: "linear-gradient(90deg,#b48c78,#dcb496)", text: "#dcb496" },
+    lore: { bg: "linear-gradient(135deg,rgba(140,110,160,0.1),rgba(180,140,200,0.05))", border: "rgba(180,140,200,0.25)", bar: "linear-gradient(90deg,#8c6ea0,#b48cc8)", text: "#b48cc8" },
   };
   const c = colors[pillar];
   return (
@@ -1568,7 +2019,7 @@ function PillarCard({ rank, xp, pillar, name, onClick }) {
 }
 
 function RankCard({ rank, xp, pillar }) {
-  const colors = { iron: { grad:"linear-gradient(135deg,rgba(139,122,94,0.1),rgba(196,169,106,0.05))", border:"rgba(196,169,106,0.2)", text:"#c4a96a", bar:"linear-gradient(90deg,#8b7a5e,#c4a96a)" }, disc: { grad:"linear-gradient(135deg,rgba(107,138,106,0.1),rgba(160,196,156,0.05))", border:"rgba(160,196,156,0.2)", text:"#a0c49c", bar:"linear-gradient(90deg,#6b8a6a,#a0c49c)" }, mind: { grad:"linear-gradient(135deg,rgba(106,122,138,0.1),rgba(156,180,196,0.05))", border:"rgba(156,180,196,0.2)", text:"#9cb4c4", bar:"linear-gradient(90deg,#6a7a8a,#9cb4c4)" }, stride: { grad:"linear-gradient(135deg,rgba(180,140,120,0.1),rgba(220,180,150,0.05))", border:"rgba(220,180,150,0.2)", text:"#dcb496", bar:"linear-gradient(90deg,#b48c78,#dcb496)" } };
+  const colors = { iron: { grad:"linear-gradient(135deg,rgba(139,122,94,0.1),rgba(196,169,106,0.05))", border:"rgba(196,169,106,0.2)", text:"#c4a96a", bar:"linear-gradient(90deg,#8b7a5e,#c4a96a)" }, disc: { grad:"linear-gradient(135deg,rgba(107,138,106,0.1),rgba(160,196,156,0.05))", border:"rgba(160,196,156,0.2)", text:"#a0c49c", bar:"linear-gradient(90deg,#6b8a6a,#a0c49c)" }, mind: { grad:"linear-gradient(135deg,rgba(106,122,138,0.1),rgba(156,180,196,0.05))", border:"rgba(156,180,196,0.2)", text:"#9cb4c4", bar:"linear-gradient(90deg,#6a7a8a,#9cb4c4)" }, stride: { grad:"linear-gradient(135deg,rgba(180,140,120,0.1),rgba(220,180,150,0.05))", border:"rgba(220,180,150,0.2)", text:"#dcb496", bar:"linear-gradient(90deg,#b48c78,#dcb496)" }, lore: { grad:"linear-gradient(135deg,rgba(140,110,160,0.1),rgba(180,140,200,0.05))", border:"rgba(180,140,200,0.25)", text:"#b48cc8", bar:"linear-gradient(90deg,#8c6ea0,#b48cc8)" } };
   const c = colors[pillar];
   return (
     <div style={{...S.lvlCard, background: c.grad, borderColor: c.border}}>
@@ -3581,4 +4032,56 @@ const S = {
   progChartBox:{background:"linear-gradient(180deg,rgba(20,18,14,0.4),rgba(10,8,6,0.6))",border:"1px solid rgba(196,169,106,0.18)",borderRadius:"10px",padding:"12px",marginBottom:"16px"},
   progChartFooter:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"6px"},
   progChartLbl:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"2px",textTransform:"uppercase"},
+  loreQuickStats:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px",marginTop:"10px",marginBottom:"6px"},
+  loreStatBox:{background:"rgba(140,110,160,0.05)",border:"1px solid rgba(180,140,200,0.15)",borderRadius:"10px",padding:"12px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:"4px"},
+  loreStatVal:{fontSize:"22px",fontWeight:"600"},
+  loreStatLbl:{fontSize:"10px",color:"#6b6252",letterSpacing:"1px",textTransform:"uppercase"},
+  bookList:{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"16px"},
+  bookRow:{display:"flex",gap:"12px",padding:"12px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"10px",cursor:"pointer",fontFamily:"inherit",alignItems:"center"},
+  bookCoverThumb:{width:"50px",height:"75px",objectFit:"cover",borderRadius:"4px",flexShrink:0},
+  bookCoverPlaceholder:{width:"50px",height:"75px",background:"rgba(180,140,200,0.1)",border:"1px solid rgba(180,140,200,0.2)",borderRadius:"4px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"24px",flexShrink:0},
+  bookTitle:{fontSize:"14px",color:"#e8dcc8",fontWeight:"600",display:"block",letterSpacing:"1px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},
+  bookAuthor:{fontSize:"12px",color:"#8b7a5e",display:"block",marginTop:"2px",fontStyle:"italic"},
+  bookProgressBar:{width:"100%",height:"3px",background:"rgba(180,140,200,0.1)",borderRadius:"2px",overflow:"hidden",marginTop:"6px"},
+  bookProgressFill:{height:"100%",background:"linear-gradient(90deg,#8c6ea0,#b48cc8)",borderRadius:"2px"},
+  bookProgressTxt:{fontSize:"10px",color:"#6b6252",display:"block",marginTop:"3px",letterSpacing:"1px"},
+  bookRatingMini:{fontSize:"12px",color:"#e8cb8c",display:"block",marginTop:"4px",letterSpacing:"2px"},
+  shelfTabs:{display:"flex",gap:"4px",marginBottom:"16px"},
+  shelfTab:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",padding:"10px 4px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"8px",cursor:"pointer",fontFamily:"inherit",color:"#8b7a5e",fontSize:"18px"},
+  shelfTabActive:{background:"rgba(180,140,200,0.12)",borderColor:"rgba(180,140,200,0.35)",color:"#b48cc8"},
+  shelfTabName:{fontSize:"10px",letterSpacing:"1px"},
+  shelfTabCount:{fontSize:"11px",color:"#6b6252",fontWeight:"600"},
+  shelfPickerRow:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"16px"},
+  shelfPickerBtn:{display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",padding:"10px 4px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"8px",cursor:"pointer",fontFamily:"inherit",color:"#8b7a5e",fontSize:"18px"},
+  shelfPickerBtnActive:{background:"rgba(180,140,200,0.12)",borderColor:"rgba(180,140,200,0.35)",color:"#b48cc8"},
+  shelfPickerName:{fontSize:"10px",letterSpacing:"1px"},
+  coverPreviewBox:{display:"flex",justifyContent:"center",margin:"12px 0"},
+  coverPreview:{maxWidth:"120px",maxHeight:"180px",borderRadius:"6px",border:"1px solid rgba(180,140,200,0.2)"},
+  bookDetailHero:{display:"flex",gap:"14px",marginBottom:"16px",padding:"14px",background:"rgba(140,110,160,0.05)",border:"1px solid rgba(180,140,200,0.15)",borderRadius:"12px"},
+  bookCoverLarge:{width:"100px",height:"150px",objectFit:"cover",borderRadius:"6px",flexShrink:0},
+  bookCoverLargePlaceholder:{width:"100px",height:"150px",background:"rgba(180,140,200,0.1)",border:"1px solid rgba(180,140,200,0.2)",borderRadius:"6px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"40px",flexShrink:0},
+  bookDetailTitle:{fontSize:"18px",color:"#e8dcc8",fontWeight:"600",display:"block",letterSpacing:"1px"},
+  bookDetailAuthor:{fontSize:"13px",color:"#8b7a5e",display:"block",marginTop:"4px",fontStyle:"italic"},
+  bookDetailShelf:{fontSize:"12px",color:"#b48cc8",display:"block",marginTop:"8px",letterSpacing:"2px"},
+  bookDetailRating:{fontSize:"16px",color:"#e8cb8c",display:"block",marginTop:"6px",letterSpacing:"3px"},
+  bookFullProgressBox:{background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"10px",padding:"12px",marginBottom:"12px"},
+  bookFullProgressBar:{width:"100%",height:"6px",background:"rgba(180,140,200,0.1)",borderRadius:"3px",overflow:"hidden",marginBottom:"6px"},
+  bookFullProgressFill:{height:"100%",background:"linear-gradient(90deg,#8c6ea0,#b48cc8)",borderRadius:"3px",transition:"width 0.6s"},
+  bookStatsRow:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"16px"},
+  bookStatBox:{background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"8px",padding:"10px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:"2px"},
+  bookStatVal:{fontSize:"20px",color:"#b48cc8",fontWeight:"600"},
+  bookStatLbl:{fontSize:"10px",color:"#6b6252",letterSpacing:"1px",textTransform:"uppercase"},
+  bookNotesDisplay:{fontSize:"13px",color:"#d4c9a8",lineHeight:"1.7",margin:"0 0 16px 0",padding:"12px",background:"rgba(139,122,94,0.04)",borderRadius:"8px",fontStyle:"italic"},
+  quoteList:{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"16px"},
+  quoteCard:{padding:"12px 16px",background:"rgba(180,140,200,0.06)",border:"1px solid rgba(180,140,200,0.18)",borderRadius:"8px",position:"relative"},
+  quoteMark:{fontSize:"22px",color:"#b48cc8",position:"absolute",top:"4px",left:"8px",fontFamily:"serif"},
+  quoteText:{fontSize:"13px",color:"#d4c9a8",lineHeight:"1.6",fontStyle:"italic",display:"block",paddingLeft:"18px"},
+  quoteRemove:{position:"absolute",top:"6px",right:"8px",background:"none",border:"none",color:"rgba(180,60,60,0.5)",fontSize:"12px",cursor:"pointer"},
+  bookSelectList:{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"16px"},
+  bookSelectRow:{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:"2px",padding:"10px 14px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"8px",cursor:"pointer",fontFamily:"inherit"},
+  bookSelectRowActive:{background:"rgba(180,140,200,0.12)",borderColor:"rgba(180,140,200,0.35)"},
+  bookSelectTitle:{fontSize:"14px",color:"#e8dcc8",fontWeight:"600"},
+  bookSelectAuthor:{fontSize:"11px",color:"#8b7a5e",fontStyle:"italic"},
+  starRow:{display:"flex",justifyContent:"center",gap:"4px",marginBottom:"16px"},
+  starBtn:{background:"none",border:"none",fontSize:"42px",cursor:"pointer",padding:"4px 6px",fontFamily:"inherit",transition:"transform 0.15s"},
 };
