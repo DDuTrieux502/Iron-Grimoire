@@ -755,6 +755,55 @@ function getQuestTarget(q, habits) {
   return q.target;
 }
 
+function computePresenceStreak({ history = [], meditations = [], habitLog = {}, readingSessions = [], runs = [] }) {
+  const activeDates = new Set();
+  history.forEach(s => s?.date && activeDates.add(s.date));
+  meditations.forEach(m => m?.date && activeDates.add(m.date));
+  runs.forEach(r => r?.date && activeDates.add(r.date));
+  readingSessions.forEach(rs => rs?.date && activeDates.add(rs.date));
+  Object.values(habitLog).forEach(log => { if (log) Object.entries(log).forEach(([d, done]) => { if (done) activeDates.add(d); }); });
+  let streak = 0;
+  const d = new Date();
+  const tk = todayKey();
+  if (!activeDates.has(tk)) { d.setDate(d.getDate() - 1); }
+  while (activeDates.has(dateKey(d))) { streak++; d.setDate(d.getDate() - 1); }
+  if (activeDates.has(tk)) streak++;
+  return streak;
+}
+
+function countActiveStreaks({ history = [], meditations = [], habits = [], habitLog = {}, readingSessions = [], runs = [] }) {
+  const tk = todayKey();
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return dateKey(d); })();
+  const fresh = (dateStr) => dateStr === tk || dateStr === yesterday;
+  let count = 0;
+  if (history[0]?.date && fresh(history[0].date)) count++;
+  if (meditations[0]?.date && fresh(meditations[0].date)) count++;
+  if (runs[0]?.date && fresh(runs[0].date)) count++;
+  if (readingSessions[0]?.date && fresh(readingSessions[0].date)) count++;
+  const habitFresh = habits.some(h => { const log = habitLog[h.id] || {}; return log[tk] || log[yesterday]; });
+  if (habitFresh) count++;
+  return count;
+}
+
+function computeNextAction({ history = [], meditations = [], habits = [], habitLog = {}, readingSessions = [], runs = [] }) {
+  const tk = todayKey();
+  const now = new Date();
+  const daysSince = (dateStr) => { if (!dateStr) return 999; const d = new Date(dateStr); return Math.floor((now - d) / 86400000); };
+  const habitsToday = habits.filter(h => habitLog[h.id]?.[tk]).length;
+  const habitsRemaining = Math.max(0, habits.length - habitsToday);
+  if (habitsRemaining > 0 && habits.length > 0) {
+    return { pillar: "disc", view: "disc-home", icon: "❂", title: `${habitsRemaining} ritual${habitsRemaining===1?"":"s"} remain today`, sub: `${habitsToday}/${habits.length} complete — keep the streak alive` };
+  }
+  const candidates = [
+    { pillar: "iron", view: "iron-home", icon: "⚔", days: daysSince(history[0]?.date), title: "Train Iron", sub: history[0]?.date ? `Last lifted ${daysSince(history[0].date)}d ago` : "First lift awaits" },
+    { pillar: "mind", view: "mind-home", icon: "☯", days: daysSince(meditations[0]?.date), title: "Sit in Stillness", sub: meditations[0]?.date ? `Last sat ${daysSince(meditations[0].date)}d ago` : "First sit awaits" },
+    { pillar: "stride", view: "stride-home", icon: "🏃", days: daysSince(runs[0]?.date), title: "Take a Run", sub: runs[0]?.date ? `Last ran ${daysSince(runs[0].date)}d ago` : "First run awaits" },
+    { pillar: "lore", view: "lore-home", icon: "📖", days: daysSince(readingSessions[0]?.date), title: "Read Wisdom", sub: readingSessions[0]?.date ? `Last read ${daysSince(readingSessions[0].date)}d ago` : "First page awaits" },
+  ];
+  candidates.sort((a, b) => b.days - a.days);
+  return candidates[0];
+}
+
 // ═══════════════════════════════════════════════════════════════
 // SVG DIAGRAMS (same as before)
 // ═══════════════════════════════════════════════════════════════
@@ -1635,43 +1684,84 @@ export default function App() {
   // ═════════════════════════════════════════════════════
   // HOME
   // ═════════════════════════════════════════════════════
-  if (view === "home") return (
-    <div style={S.c}>
-      <AnimStyles/>
-      <div style={S.hdr}>
-        <div style={S.tRow}><span style={S.dm}>◆</span><h1 style={S.tt}>Iron Grimoire</h1><span style={S.dm}>◆</span></div>
-        <p style={S.st}>{user}'s Path{ascensions > 0 ? ` · ✺ Ascended ${ascensions}` : ""}</p>
-        {ascensions > 0 && <p style={S.multTx}>+{Math.round(ascensions*10)}% XP multiplier active</p>}
+  if (view === "home") {
+    const presenceStreak = computePresenceStreak({ history, meditations, habitLog, readingSessions, runs });
+    const activeStreakCount = countActiveStreaks({ history, meditations, habits, habitLog, readingSessions, runs });
+    const nextAction = computeNextAction({ history, meditations, habits, habitLog, readingSessions, runs });
+    const completedToday = activeDailyQuests.filter(q => q.completed).length;
+    const totalToday = activeDailyQuests.length + (activeWeeklyQuest ? 1 : 0);
+    return (
+      <div style={{...S.c, ...S.hubWrap}}>
+        <AnimStyles/>
+
+        <div style={S.streakStripe}>
+          <span style={S.streakDay}>✦ {presenceStreak > 0 ? `Day ${presenceStreak}` : "Begin the Path"}</span>
+          <span style={S.streakAlive}>{activeStreakCount} {activeStreakCount === 1 ? "streak" : "streaks"} alive</span>
+        </div>
+
+        <div style={S.hubGreeting}>
+          <span style={S.hubGreetingName}>{user}</span>
+          {ascensions > 0 && <span style={S.hubAscended}>✺ Ascended ×{ascensions} · +{Math.round(ascensions*10)}%</span>}
+        </div>
+
+        {(activeDailyQuests.length > 0 || activeWeeklyQuest) && (
+          <div style={S.hubHero}>
+            <div style={S.hubHeroHead}>
+              <span style={S.hubHeroTitle}>⟡ Today's Quests</span>
+              <span style={S.hubHeroCount}>{completedToday}/{totalToday}</span>
+            </div>
+            <div style={S.hubHeroList}>
+              {activeDailyQuests.map(q => <QuestRow key={q.id} quest={q} compact/>)}
+              {activeWeeklyQuest && <QuestRow quest={activeWeeklyQuest} compact weekly/>}
+            </div>
+            <button style={S.hubHeroLink} onClick={()=>setView("quests")}>View All Quests ›</button>
+          </div>
+        )}
+
+        {nextAction && (
+          <button style={S.nextActionCard} onClick={()=>setView(nextAction.view)}>
+            <span style={S.nextActionLabel}>Next</span>
+            <div style={S.nextActionRow}>
+              <span style={S.nextActionIcon}>{nextAction.icon}</span>
+              <div style={S.nextActionMid}>
+                <span style={S.nextActionTitle}>{nextAction.title}</span>
+                <span style={S.nextActionSub}>{nextAction.sub}</span>
+              </div>
+              <span style={S.nextActionArrow}>›</span>
+            </div>
+          </button>
+        )}
+
+        <div style={S.quickLogSection}>
+          <div style={S.quickLogLabel}>Quick Log</div>
+          <div style={S.quickLogRow}>
+            <button style={S.quickLogBtn} onClick={()=>setView("iron-home")} title="Iron">⚔</button>
+            <button style={S.quickLogBtn} onClick={()=>setView("disc-home")} title="Discipline">❂</button>
+            <button style={S.quickLogBtn} onClick={()=>setView("mind-home")} title="Mind">☯</button>
+            <button style={S.quickLogBtn} onClick={()=>setView("stride-home")} title="Stride">🏃</button>
+            <button style={S.quickLogBtn} onClick={()=>setView("lore-home")} title="Lore">📖</button>
+          </div>
+        </div>
+
+        <div style={S.hunterStatus}>
+          <div style={S.hunterStatusHead}>Hunter Status</div>
+          <div style={S.hunterStatusList}>
+            <CompactPillarRow rank={iron} xp={ironXP} pillar="iron" name="Iron" onClick={()=>setView("iron-home")}/>
+            <CompactPillarRow rank={disc} xp={discXP} pillar="disc" name="Discipline" onClick={()=>setView("disc-home")}/>
+            <CompactPillarRow rank={mind} xp={mindXP} pillar="mind" name="Mind" onClick={()=>setView("mind-home")}/>
+            <CompactPillarRow rank={stride} xp={strideXP} pillar="stride" name="Stride" onClick={()=>setView("stride-home")}/>
+            <CompactPillarRow rank={lore} xp={loreXP} pillar="lore" name="Lore" onClick={()=>setView("lore-home")}/>
+          </div>
+        </div>
+
+        {anyMaxed && <button style={S.ascendBtn} onClick={()=>setView("ascend")}>✺ ASCEND ✺</button>}
+
+        <button style={S.hubSignOut} onClick={()=>{setUser(null);setView("home");}}>✕ Sign Out</button>
+
+        <BottomTabBar currentTab="home" onNav={(v)=>setView(v)}/>
       </div>
-
-      <div style={S.pillarGrid}>
-        <PillarCard rank={iron} xp={ironXP} pillar="iron" name="Iron" onClick={()=>setView("iron-home")}/>
-        <PillarCard rank={disc} xp={discXP} pillar="disc" name="Discipline" onClick={()=>setView("disc-home")}/>
-        <PillarCard rank={mind} xp={mindXP} pillar="mind" name="Mind" onClick={()=>setView("mind-home")}/>
-        <PillarCard rank={stride} xp={strideXP} pillar="stride" name="Stride" onClick={()=>setView("stride-home")}/>
-        <PillarCard rank={lore} xp={loreXP} pillar="lore" name="Lore" onClick={()=>setView("lore-home")}/>
-      </div>
-
-      <div style={S.dv}>━━━ ◈ ━━━</div>
-
-      {/* Active Quests */}
-      <div style={S.questHome}>
-        <div style={S.questHomeTitle}>⟡ Today's Quests</div>
-        {activeDailyQuests.map(q => <QuestRow key={q.id} quest={q} compact/>)}
-        {activeWeeklyQuest && <><div style={S.questHomeTitle}>⟡ This Week</div><QuestRow quest={activeWeeklyQuest} compact weekly/></>}
-      </div>
-
-      <div style={S.navR}>
-        <button style={S.navB} onClick={()=>setView("chronicle")}>◈ Chronicle</button>
-        <button style={S.navB} onClick={()=>setView("quests")}>⟡ Quests</button>
-        <button style={S.navB} onClick={()=>setView("achievements")}>★ Feats</button>
-      </div>
-
-      {anyMaxed && <button style={S.ascendBtn} onClick={()=>setView("ascend")}>✺ ASCEND ✺</button>}
-
-      <button style={S.logoutBtn} onClick={()=>{setUser(null);setView("home");}}>✕ Sign Out</button>
-    </div>
-  );
+    );
+  }
 
   // ═════════════════════════════════════════════════════
   // QUESTS VIEW
@@ -1695,7 +1785,7 @@ export default function App() {
     const filtered = achievementFilter === "all" ? ACHIEVEMENTS : ACHIEVEMENTS.filter(a => a.cat === achievementFilter);
     const unlockedCount = filtered.filter(a => unlockedAchievements.includes(a.id)).length;
     return (
-      <div style={S.c}>
+      <div style={{...S.c, ...S.hubWrap}}>
         <AnimStyles/>
         <div style={S.wH}><button style={S.bk} onClick={()=>setView("home")}>‹</button><h2 style={S.wT}>★ Feats of the Path</h2></div>
         <p style={S.aSub}>{unlockedCount} of {filtered.length} unlocked in this category</p>
@@ -1714,6 +1804,7 @@ export default function App() {
             {u&&<span style={S.aCk}>✓</span>}
           </div>
         );})}</div>
+        <BottomTabBar currentTab="achievements" onNav={(v)=>setView(v)}/>
       </div>
     );
   }
@@ -1744,7 +1835,7 @@ export default function App() {
   // ═════════════════════════════════════════════════════
   // CHRONICLE (ANALYTICS + BODY ALMANAC)
   // ═════════════════════════════════════════════════════
-  if (view === "chronicle") return <ChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} onBack={()=>setView("home")} onBodyAlmanac={()=>setView("body-almanac")} onInsights={()=>setView("insights")} onMonthlyChronicle={()=>setView("monthly-chronicle")}/>;
+  if (view === "chronicle") return <ChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} onBack={()=>setView("home")} onBodyAlmanac={()=>setView("body-almanac")} onInsights={()=>setView("insights")} onMonthlyChronicle={()=>setView("monthly-chronicle")} onTabNav={(v)=>setView(v)}/>;
   if (view === "monthly-chronicle") return <MonthlyChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} unlockedAchievements={unlockedAchievements} user={user} onBack={()=>setView("chronicle")}/>;
   if (view === "insights") return <InsightsView history={history} meditations={meditations} habits={habits} habitLog={habitLog} ironXP={ironXP} discXP={discXP} mindXP={mindXP} onBack={()=>setView("chronicle")}/>;
   if (view === "body-almanac") return <BodyAlmanacView bodyLog={bodyLog} trackedMetrics={trackedMetrics} logFrequency={logFrequency} onBack={()=>setView("chronicle")} onLogNew={()=>setView("body-log")} onSettings={()=>setView("body-settings")}/>;
@@ -1837,7 +1928,7 @@ export default function App() {
       <div style={S.todaySummary}>{completedToday}/{habits.length} rituals completed today</div>
       <div style={S.dv}>━━━ ◈ ━━━</div>
       <div style={S.sectionHead}>Today's Rituals</div>
-      <div style={S.habitList}>{habits.length===0&&<p style={S.emp}>No habits yet.</p>}{habits.map(h=>{const done=habitLog[h.id]?.[tk];const streak=calcHabitStreak(habitLog,h.id);return(<button key={h.id} style={{...S.habitCard,...(done?S.habitCardDone:{})}} onClick={()=>toggleHabitToday(h.id)}><span style={S.habitIcon}>{h.icon}</span><div style={S.habitMid}><span style={S.habitName}>{h.name}</span>{streak>0&&<span style={S.habitStreak}>🔥 {streak}d streak</span>}</div><button style={{...S.habitCheck,...(done?S.habitCheckDone:{})}} onClick={(e)=>{e.stopPropagation();setActiveHabit(h);setView("habit-detail");}}>ⓘ</button></button>);})}</div>
+      <div style={S.habitList}>{habits.length===0&&<p style={S.emp}>No habits yet.</p>}{habits.map(h=>{const done=habitLog[h.id]?.[tk];const streak=calcHabitStreak(habitLog,h.id);return(<button key={h.id} style={{...S.habitCard,...(done?S.habitCardDone:{})}} onClick={()=>toggleHabitToday(h.id)}><span style={S.habitIcon}>{h.icon}</span><div style={S.habitMid}><span style={S.habitName}>{h.name}</span>{streak>0&&<span style={S.habitStreak}>🔥 {streak}d streak</span>}</div><span role="button" tabIndex={0} style={{...S.habitCheck,...(done?S.habitCheckDone:{})}} onClick={(e)=>{e.stopPropagation();setActiveHabit(h);setView("habit-detail");}} onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();setActiveHabit(h);setView("habit-detail");}}}>ⓘ</span></button>);})}</div>
       <button style={S.addHabitBtn} onClick={()=>setView("add-habit")}>+ Add Ritual</button>
       <div style={S.navR}><button style={S.navB} onClick={()=>setView("disc-ranks")}>◈ Ranks</button></div>
     </div>
@@ -2031,6 +2122,50 @@ function RankCard({ rank, xp, pillar }) {
         </div>
       </div>
       <div style={S.xpBg}><div style={{...S.xpFl,width:`${rank.progress*100}%`,background:c.bar}}/></div>
+    </div>
+  );
+}
+
+function CompactPillarRow({ rank, xp, pillar, name, onClick }) {
+  const colors = {
+    iron: { bar: "linear-gradient(90deg,#8b7a5e,#c4a96a)", text: "#c4a96a" },
+    disc: { bar: "linear-gradient(90deg,#6b8a6a,#a0c49c)", text: "#a0c49c" },
+    mind: { bar: "linear-gradient(90deg,#6a7a8a,#9cb4c4)", text: "#9cb4c4" },
+    stride: { bar: "linear-gradient(90deg,#b48c78,#dcb496)", text: "#dcb496" },
+    lore: { bar: "linear-gradient(90deg,#8c6ea0,#b48cc8)", text: "#b48cc8" },
+  };
+  const c = colors[pillar];
+  return (
+    <button style={S.compactPillar} onClick={onClick}>
+      <span style={S.compactPillarEmb}>{rank.current.emblem}</span>
+      <div style={S.compactPillarMid}>
+        <div style={S.compactPillarTopRow}>
+          <span style={S.compactPillarName}>{name}</span>
+          <span style={{...S.compactPillarTier, color: c.text}}>{rank.current.tier}·{rank.current.level}</span>
+        </div>
+        <div style={S.compactPillarBar}><div style={{...S.compactPillarBarFill, width: `${rank.progress*100}%`, background: c.bar}}/></div>
+      </div>
+      <span style={S.compactPillarXP}>{xp >= 1000 ? `${(xp/1000).toFixed(1)}k` : xp}</span>
+    </button>
+  );
+}
+
+function BottomTabBar({ currentTab, onNav }) {
+  const tabs = [
+    { id: "home", icon: "✦", label: "Today" },
+    { id: "chronicle", icon: "◈", label: "Chronicle" },
+    { id: "achievements", icon: "★", label: "Feats" },
+  ];
+  return (
+    <div style={S.tabBar}>
+      <div style={S.tabBarInner}>
+        {tabs.map(t => (
+          <button key={t.id} style={{...S.tabBtn, ...(currentTab === t.id ? S.tabBtnActive : {})}} onClick={() => onNav(t.id)}>
+            <span style={S.tabIcon}>{t.icon}</span>
+            <span style={S.tabLabel}>{t.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2286,7 +2421,7 @@ function MindSettings({ medTypes, medDurationPresets, onSave, onBack }) {
   );
 }
 
-function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, ironXP, discXP, mindXP, strideXP, onBack, onBodyAlmanac, onInsights, onMonthlyChronicle }) {
+function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, ironXP, discXP, mindXP, strideXP, onBack, onBodyAlmanac, onInsights, onMonthlyChronicle, onTabNav }) {
   const wk = weekKey(new Date());
   const sessionsThisWeek = history.filter(h => weekKey(h.date) === wk).length;
   const medsThisWeek = meditations.filter(m => weekKey(m.date) === wk).length;
@@ -2308,7 +2443,7 @@ function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, 
   const prevMonthName = prevMonth.toLocaleString("default", { month: "long" });
 
   return (
-    <div style={S.c}>
+    <div style={{...S.c, ...(onTabNav ? S.hubWrap : {})}}>
       <AnimStyles/>
       <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>◈ Chronicle</h2></div>
       <p style={S.chronicleSubtitle}>Your path, in numbers</p>
@@ -2356,6 +2491,7 @@ function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, 
         <div style={S.allTimeRow}><span style={S.allTimeLbl}>Miles Run</span><span style={S.allTimeVal}>{totalMiles.toFixed(1)}</span></div>
         <div style={S.allTimeRow}><span style={S.allTimeLbl}>Habits Tracked</span><span style={S.allTimeVal}>{habits.length}</span></div>
       </div>
+      {onTabNav && <BottomTabBar currentTab="chronicle" onNav={onTabNav}/>}
     </div>
   );
 }
@@ -4084,4 +4220,48 @@ const S = {
   bookSelectAuthor:{fontSize:"11px",color:"#8b7a5e",fontStyle:"italic"},
   starRow:{display:"flex",justifyContent:"center",gap:"4px",marginBottom:"16px"},
   starBtn:{background:"none",border:"none",fontSize:"42px",cursor:"pointer",padding:"4px 6px",fontFamily:"inherit",transition:"transform 0.15s"},
+  hubWrap:{padding:"16px 16px 96px 16px"},
+  streakStripe:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"linear-gradient(135deg,rgba(196,169,106,0.08),rgba(139,122,94,0.04))",border:"1px solid rgba(196,169,106,0.2)",borderRadius:"10px",marginBottom:"14px"},
+  streakDay:{fontSize:"14px",color:"#c4a96a",letterSpacing:"2px",fontWeight:"600"},
+  streakAlive:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"2px",textTransform:"uppercase"},
+  hubGreeting:{display:"flex",alignItems:"baseline",justifyContent:"center",gap:"10px",marginBottom:"18px"},
+  hubGreetingName:{fontSize:"22px",color:"#e8dcc8",letterSpacing:"3px",fontWeight:"400",textTransform:"uppercase"},
+  hubAscended:{fontSize:"11px",color:"#b89cc4",letterSpacing:"2px"},
+  hubHero:{padding:"14px",background:"rgba(196,169,106,0.05)",border:"1px solid rgba(196,169,106,0.18)",borderRadius:"12px",marginBottom:"14px"},
+  hubHeroHead:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"10px"},
+  hubHeroTitle:{fontSize:"12px",color:"#c4a96a",letterSpacing:"3px",textTransform:"uppercase",fontWeight:"600"},
+  hubHeroCount:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"2px"},
+  hubHeroList:{display:"flex",flexDirection:"column",gap:"6px"},
+  hubHeroLink:{display:"block",textAlign:"center",marginTop:"10px",padding:"6px",background:"none",border:"none",color:"#8b7a5e",fontFamily:"inherit",fontSize:"11px",letterSpacing:"2px",cursor:"pointer",textTransform:"uppercase"},
+  nextActionCard:{width:"100%",display:"flex",flexDirection:"column",alignItems:"flex-start",gap:"4px",padding:"16px",background:"linear-gradient(135deg,rgba(139,122,94,0.15),rgba(196,169,106,0.08))",border:"1px solid rgba(196,169,106,0.3)",borderRadius:"12px",marginBottom:"14px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",color:"#d4c9a8"},
+  nextActionLabel:{fontSize:"10px",color:"#8b7a5e",letterSpacing:"4px",textTransform:"uppercase"},
+  nextActionRow:{display:"flex",alignItems:"center",gap:"12px",width:"100%"},
+  nextActionIcon:{fontSize:"28px",flexShrink:0},
+  nextActionMid:{flex:1,display:"flex",flexDirection:"column",gap:"2px"},
+  nextActionTitle:{fontSize:"17px",color:"#e8dcc8",fontWeight:"600",letterSpacing:"1px"},
+  nextActionSub:{fontSize:"12px",color:"#8b7a5e",letterSpacing:"1px"},
+  nextActionArrow:{color:"#c4a96a",fontSize:"22px",flexShrink:0},
+  quickLogSection:{marginBottom:"14px"},
+  quickLogLabel:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"3px",textTransform:"uppercase",marginBottom:"8px"},
+  quickLogRow:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:"6px"},
+  quickLogBtn:{padding:"14px 0",background:"rgba(139,122,94,0.06)",border:"1px solid rgba(139,122,94,0.18)",borderRadius:"10px",color:"#d4c9a8",fontFamily:"inherit",fontSize:"22px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"},
+  hunterStatus:{marginBottom:"16px"},
+  hunterStatusHead:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"3px",textTransform:"uppercase",marginBottom:"8px"},
+  hunterStatusList:{display:"flex",flexDirection:"column",gap:"6px"},
+  compactPillar:{width:"100%",display:"flex",alignItems:"center",gap:"10px",padding:"10px 12px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"8px",cursor:"pointer",fontFamily:"inherit",color:"#d4c9a8"},
+  compactPillarEmb:{fontSize:"20px",flexShrink:0,width:"24px",textAlign:"center"},
+  compactPillarMid:{flex:1,display:"flex",flexDirection:"column",gap:"4px"},
+  compactPillarTopRow:{display:"flex",justifyContent:"space-between",alignItems:"baseline"},
+  compactPillarName:{fontSize:"13px",color:"#e8dcc8",letterSpacing:"1px",fontWeight:"600"},
+  compactPillarTier:{fontSize:"10px",letterSpacing:"1px",fontWeight:"600"},
+  compactPillarBar:{width:"100%",height:"3px",background:"rgba(139,122,94,0.1)",borderRadius:"2px",overflow:"hidden"},
+  compactPillarBarFill:{height:"100%",borderRadius:"2px",transition:"width 0.6s"},
+  compactPillarXP:{fontSize:"11px",color:"#6b6252",letterSpacing:"1px",flexShrink:0,fontVariantNumeric:"tabular-nums"},
+  hubSignOut:{width:"100%",padding:"8px",background:"none",border:"none",color:"#4a4236",fontFamily:"inherit",fontSize:"11px",letterSpacing:"2px",cursor:"pointer",marginTop:"8px"},
+  tabBar:{position:"fixed",bottom:0,left:0,right:0,background:"rgba(10,10,15,0.96)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",borderTop:"1px solid rgba(139,122,94,0.2)",padding:"8px 0 calc(8px + env(safe-area-inset-bottom)) 0",zIndex:100},
+  tabBarInner:{maxWidth:"480px",margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"4px",padding:"0 16px"},
+  tabBtn:{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",padding:"8px 4px",background:"none",border:"none",color:"#6b6252",fontFamily:"inherit",cursor:"pointer",borderRadius:"8px"},
+  tabBtnActive:{color:"#c4a96a",background:"rgba(196,169,106,0.08)"},
+  tabIcon:{fontSize:"18px",lineHeight:1},
+  tabLabel:{fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase"},
 };
