@@ -5,21 +5,56 @@ import { useState, useEffect, useMemo } from "react";
 // ═══════════════════════════════════════════════════════════════
 
 const EXERCISE_INFO = {
-  "Leg Press": { movement: "legpress", cues: ["Feet shoulder-width on platform", "Lower until knees ~90°", "Don't lock knees at top", "Keep lower back pressed to pad"] },
-  "Chest Press": { movement: "push", cues: ["Retract shoulder blades", "Elbows around 45° from torso", "Full range of motion", "Control the return"] },
-  "Shoulder Press": { movement: "overhead", cues: ["Neutral spine, core tight", "Press directly overhead", "Don't flare elbows excessively", "Slow eccentric"] },
-  "Triceps Extension": { movement: "tricep", cues: ["Elbows fixed at sides", "Squeeze triceps at bottom", "Full stretch at top", "Slow controlled tempo"] },
-  "Leg Extension": { movement: "legext", cues: ["Smooth control throughout", "Pause briefly at top", "No momentum or swinging", "Full range of motion"] },
-  "Cable Face Pulls": { movement: "facepull", cues: ["Rope attachment at face height", "Pull to forehead level", "External rotation at end", "Squeeze rear delts"] },
-  "Lat Pulldown": { movement: "pulldown", cues: ["Pull bar to upper chest", "Slight backward lean", "Drive elbows down and back", "No swinging or bouncing"] },
-  "Seated Row": { movement: "row", cues: ["Chest up, shoulders back", "Squeeze shoulder blades together", "Don't shrug", "Control the return"] },
-  "Biceps Curl": { movement: "curl", cues: ["Elbows pinned to sides", "Full range of motion", "Squeeze at the top", "Slow eccentric (3 seconds)"] },
-  "Leg Press (narrow)": { movement: "legpress", cues: ["Feet close together", "Emphasizes quads", "Don't lock knees", "Control tempo"] },
-  "Seated Leg Curl": { movement: "legcurl", cues: ["Flex at the knees", "Squeeze hamstrings hard", "Smooth controlled tempo", "Full range"] },
-  "Cable Pallof Press": { movement: "pallof", cues: ["Resist rotation — core tight", "Press straight out from chest", "Don't twist torso", "Hold extended briefly"] },
-  "Incline Press": { movement: "push", cues: ["Upper chest focus", "Elbows tucked slightly", "Full range of motion", "Stable core, no arching"] },
-  "DB Lateral Raises": { movement: "lateral", cues: ["Slight bend in elbows", "Lead with elbows", "Don't shrug shoulders", "Control descent"] },
-  "Cable Triceps Pushdown": { movement: "tricep", cues: ["Elbows pinned at sides", "Squeeze triceps at bottom", "Slow return up", "Don't lean forward"] },
+  // ── Foundation (classic) movements ──
+  "Leg Press": { muscles: "Quads · Glutes · Hamstrings", howto: ["Sit with back flat against the pad, feet shoulder-width on the platform.", "Unrack and lower the platform by bending the knees toward your chest.", "Descend until knees reach ~90° without your lower back rounding off the pad.", "Drive through mid-foot back to near lockout — don't slam the knees straight."], cues: ["Feet shoulder-width on platform", "Lower until knees ~90°", "Don't lock knees at top", "Keep lower back pressed to pad"] },
+  "Chest Press": { muscles: "Chest · Front Delts · Triceps", howto: ["Set the seat so the handles align with mid-chest.", "Retract your shoulder blades and plant your feet.", "Press the handles forward to near lockout without shrugging.", "Control the return until you feel a stretch across the chest."], cues: ["Retract shoulder blades", "Elbows around 45° from torso", "Full range of motion", "Control the return"] },
+  "Shoulder Press": { muscles: "Shoulders · Triceps", howto: ["Sit tall with your back supported and core braced.", "Start with handles at shoulder height, wrists stacked over elbows.", "Press directly overhead until the arms are nearly straight.", "Lower under control back to shoulder height."], cues: ["Neutral spine, core tight", "Press directly overhead", "Don't flare elbows excessively", "Slow eccentric"] },
+  "Triceps Extension": { muscles: "Triceps", howto: ["Fix your upper arms at your sides or overhead per the variation.", "Keep the elbows still — only the forearms move.", "Extend until the arms are straight and the triceps squeeze.", "Return slowly to a full stretch."], cues: ["Elbows fixed at sides", "Squeeze triceps at bottom", "Full stretch at top", "Slow controlled tempo"] },
+  "Leg Extension": { muscles: "Quads", howto: ["Sit with the pad on your lower shins, knees at the seat's pivot.", "Extend the knees to lift the pad smoothly.", "Pause and squeeze the quads briefly at the top.", "Lower under control without letting the stack slam."], cues: ["Smooth control throughout", "Pause briefly at top", "No momentum or swinging", "Full range of motion"] },
+  "Cable Face Pulls": { muscles: "Rear Delts · Upper Back", howto: ["Set a rope at face height and step back to load the cable.", "Pull the rope toward your forehead, splitting the ends apart.", "Externally rotate so your knuckles face behind you.", "Return slowly, keeping tension on the rear delts."], cues: ["Rope attachment at face height", "Pull to forehead level", "External rotation at end", "Squeeze rear delts"] },
+  "Lat Pulldown": { muscles: "Lats · Biceps", howto: ["Grip the bar wider than shoulders, pin your thighs under the pad.", "Lean back slightly and set your chest tall.", "Drive the elbows down and into your sides, pulling the bar to your upper chest.", "Control the bar back up to a full stretch overhead."], cues: ["Pull bar to upper chest", "Slight backward lean", "Drive elbows down and back", "No swinging or bouncing"] },
+  "Seated Row": { muscles: "Mid-Back · Lats · Biceps", howto: ["Sit tall with a slight knee bend and chest up.", "Pull the handle to your navel, leading with the elbows.", "Squeeze the shoulder blades together and hold a beat.", "Extend the arms back under control without rounding forward."], cues: ["Chest up, shoulders back", "Squeeze shoulder blades together", "Don't shrug", "Control the return"] },
+  "Biceps Curl": { muscles: "Biceps", howto: ["Stand or sit with the weights at your sides, palms forward.", "Keep the elbows pinned to your ribs.", "Curl up by flexing the biceps — no swinging.", "Lower over ~3 seconds to a full stretch."], cues: ["Elbows pinned to sides", "Full range of motion", "Squeeze at the top", "Slow eccentric (3 seconds)"] },
+  "Leg Press (narrow)": { muscles: "Quads", howto: ["Place your feet close together, low on the platform.", "Lower under control to emphasize the quads.", "Stop before the lower back lifts off the pad.", "Drive back up without locking the knees."], cues: ["Feet close together", "Emphasizes quads", "Don't lock knees", "Control tempo"] },
+  "Seated Leg Curl": { muscles: "Hamstrings", howto: ["Set the pad just above your heels with thighs locked down.", "Flex at the knees to drive your heels under the seat.", "Squeeze the hamstrings hard at the bottom.", "Return slowly to full extension."], cues: ["Flex at the knees", "Squeeze hamstrings hard", "Smooth controlled tempo", "Full range"] },
+  "Cable Pallof Press": { muscles: "Core · Obliques", howto: ["Stand side-on to a cable at chest height, handle at your sternum.", "Brace hard and press the handle straight out from your chest.", "Resist the cable's pull to rotate you — stay square.", "Hold briefly, return to the chest, repeat before switching sides."], cues: ["Resist rotation — core tight", "Press straight out from chest", "Don't twist torso", "Hold extended briefly"] },
+  "Incline Press": { muscles: "Upper Chest · Front Delts · Triceps", howto: ["Set an incline bench/press to ~30°.", "Tuck the elbows slightly and keep the core stable.", "Press up and slightly back over the upper chest.", "Lower under control to a deep stretch, no excessive arching."], cues: ["Upper chest focus", "Elbows tucked slightly", "Full range of motion", "Stable core, no arching"] },
+  "DB Lateral Raises": { muscles: "Side Delts", howto: ["Hold dumbbells at your sides with a slight elbow bend.", "Lead with the elbows, raising the weights out to shoulder height.", "Keep the traps relaxed — don't shrug.", "Lower slowly under control."], cues: ["Slight bend in elbows", "Lead with elbows", "Don't shrug shoulders", "Control descent"] },
+  "Cable Triceps Pushdown": { muscles: "Triceps", howto: ["Grip a bar or rope at a high pulley, elbows at your sides.", "Push down until the arms are straight and triceps squeeze.", "Keep the elbows pinned — don't lean over the weight.", "Return slowly to ~90° at the elbow."], cues: ["Elbows pinned at sides", "Squeeze triceps at bottom", "Slow return up", "Don't lean forward"] },
+
+  // ── The Demon & The Sun movements ──
+  "Smith Bent-Over Row": { muscles: "Back · Rear Delts · Biceps · Grip", howto: ["Set the bar on the Smith at mid-shin height; grip just outside your knees.", "Hinge to ~45°, soft knees, flat back, brace your core.", "Drive your elbows down and back, pulling the bar to your lower ribs.", "Control the descent until your lats stretch, then repeat — no jerking."], cues: ["Hinge ~45°, flat back", "Pull to the lower ribs", "Drive elbows down and back", "Control the negative 2–3 sec"] },
+  "Seated Cable Row": { muscles: "Mid-Back · Lats · Biceps", howto: ["Sit tall with a slight knee bend, neutral or close grip.", "Pull the handle to your navel, leading with the elbows.", "Squeeze the shoulder blades together and hold a beat.", "Extend the arms forward under control to a full stretch."], cues: ["Pull to the navel", "Squeeze blades, hold a beat", "Chest tall, no rounding", "Mid-back thickness"] },
+  "Single-Arm DB Row": { muscles: "Lats · Mid-Back · Biceps", howto: ["Brace a hand and knee on a bench, opposite foot planted.", "Let the dumbbell hang for a full stretch at the bottom.", "Drive the elbow up to your hip, keeping it close to the body.", "Lower under control without twisting the torso."], cues: ["Full stretch at the bottom", "Drive elbow to the hip", "No torso rotation", "Heavy and controlled"] },
+  "DB Pullover": { muscles: "Lats · Serratus · Chest", howto: ["Lie on a bench holding one dumbbell over your chest with both hands.", "Keep a slight elbow bend throughout.", "Lower the weight back over your head until you feel a deep lat/rib stretch.", "Pull it back over your chest using the lats."], cues: ["Stretch under load", "Slight fixed elbow bend", "Expand the ribcage", "Control, don't drop"] },
+  "DB Hammer Curl": { muscles: "Biceps · Brachialis · Forearms", howto: ["Hold the dumbbells with a neutral (palms-facing) grip.", "Pin the elbows to your sides.", "Curl up without rotating the wrists.", "Lower slowly to a full stretch."], cues: ["Neutral grip throughout", "Elbows pinned", "No swinging", "Slow eccentric"] },
+  "DB Curl": { muscles: "Biceps", howto: ["Hold dumbbells at your sides, palms forward.", "Keep the elbows fixed against your ribs.", "Curl up and squeeze the biceps at the top.", "Lower over ~3 seconds to a full stretch."], cues: ["Elbows pinned to sides", "Full range of motion", "Squeeze at the top", "Slow eccentric"] },
+  "Farmer's Carry": { muscles: "Grip · Traps · Core · Whole Body", howto: ["Pick up your heaviest dumbbells with a hard grip and tall posture.", "Brace your core and walk with short, controlled steps.", "Keep the shoulders back and down — don't lean.", "Carry for the target distance or time, crushing the handles."], cues: ["Crush the handles", "Tall posture, ribs down", "Short controlled steps", "Brace the whole way"] },
+  "Smith Incline Press": { muscles: "Upper Chest · Front Delts · Triceps", howto: ["Set an incline bench under the Smith bar at ~30°; bar over the upper chest.", "Retract the shoulder blades, plant the feet, brace.", "Unrack and lower the bar to the upper chest under control.", "Press up and slightly back along the bar's path to lockout."], cues: ["Bar to upper chest", "Shoulder blades retracted", "Control the negative", "Upper-chest armor"] },
+  "Flat DB Press": { muscles: "Chest · Front Delts · Triceps", howto: ["Lie flat with a dumbbell in each hand at chest level.", "Retract the shoulder blades and keep the feet planted.", "Press the dumbbells up and slightly together to near lockout.", "Lower under control to a deep chest stretch."], cues: ["Deep stretch at the bottom", "Controlled tempo", "Drive slightly together up top", "Stable shoulder blades"] },
+  "Smith Pin Press": { muscles: "Chest · Triceps · Lockout Power", howto: ["Set the safety pins at your sticking point on the Smith.", "Lie back so the bar rests dead on the pins over your chest.", "From a complete dead stop, press explosively to lockout.", "Reset the bar fully on the pins between every rep — no bouncing."], cues: ["Dead stop on the pins", "Explosive press up", "Set pins at sticking point", "Builds lockout strength"] },
+  "DB Lateral Raise": { muscles: "Side Delts", howto: ["Hold the dumbbells at your sides with a slight elbow bend.", "Lead with the elbows out to shoulder height.", "Keep the traps relaxed — no shrugging.", "Lower slowly under control."], cues: ["Lead with the elbows", "Don't shrug", "Control the descent", "The sun-god silhouette"] },
+  "DB Overhead Extension": { muscles: "Triceps (long head)", howto: ["Hold one dumbbell overhead with both hands, or one per hand.", "Keep the upper arms vertical and elbows pointing forward.", "Lower the weight behind your head to a deep stretch.", "Extend back to lockout, squeezing the triceps."], cues: ["Upper arms vertical", "Deep stretch behind the head", "Elbows don't flare wide", "Squeeze at lockout"] },
+  "DB Skull Crusher": { muscles: "Triceps", howto: ["Lie on a bench holding dumbbells over your chest, palms facing in.", "Keep the upper arms still and pointing up.", "Bend the elbows to lower the weights toward your forehead/ears.", "Extend back up without moving the upper arms."], cues: ["Only the forearms move", "Lower to the forehead/ears", "Elbows stay pointing up", "Control the negative"] },
+  "DB Close-Grip Press": { muscles: "Triceps · Inner Chest", howto: ["Lie flat holding two dumbbells pressed together over your chest.", "Keep the dumbbells touching and elbows tucked close.", "Lower to the chest under control.", "Press up while keeping the weights pressed together."], cues: ["Dumbbells stay together", "Elbows tucked", "Triceps-focused press", "Push to failure on the finisher"] },
+  "Smith Squat": { muscles: "Quads · Glutes · Posterior Chain", howto: ["Set the Smith bar across your upper traps; feet slightly forward of the bar.", "Brace hard and unrack.", "Descend to a depth you control, knees tracking over the toes.", "Drive through mid-foot back up without locking out hard."], cues: ["Feet slightly forward", "Brace hard before descending", "Full depth you control", "Drive through mid-foot"] },
+  "Smith Front Squat": { muscles: "Quads · Core · Glutes", howto: ["Rack the Smith bar across the front of your shoulders, elbows high.", "Keep the torso upright and core braced.", "Descend straight down to depth, elbows up the whole time.", "Drive up through the heels and mid-foot."], cues: ["Elbows high, torso upright", "Brace the core", "Straight-down descent", "Heaviest output of the week"] },
+  "Romanian Deadlift": { muscles: "Hamstrings · Glutes · Lower Back", howto: ["Hold the bar/dumbbells at the hips with soft knees.", "Push the hips back, sliding the weight down your thighs.", "Lower until you feel a deep hamstring stretch — no spinal rounding.", "Drive the hips forward to stand tall, squeezing the glutes."], cues: ["Push the hips back", "Feel the hamstring stretch", "No spinal rounding", "Hinge, don't squat"] },
+  "DB Romanian Deadlift": { muscles: "Hamstrings · Glutes · Lower Back", howto: ["Hold a dumbbell in each hand in front of your thighs, soft knees.", "Hinge at the hips, pushing them back as the weights lower.", "Keep the dumbbells close to your legs and the back flat.", "Stand tall by driving the hips forward and squeezing the glutes."], cues: ["Hips back, weights close", "Flat back throughout", "Stretch the hamstrings", "Hinge power"] },
+  "Lying Leg Curl": { muscles: "Hamstrings", howto: ["Lie face-down with the pad on your lower calves/Achilles.", "Curl your heels toward your glutes by flexing the knees.", "Squeeze the hamstrings hard at the top.", "Lower under control — no swinging or hip lift."], cues: ["Flex at the knees", "Squeeze hard at the top", "Control the negative", "Keep hips down"] },
+  "Smith Standing Calf Raise": { muscles: "Calves", howto: ["Set the Smith bar across your traps, balls of the feet on a plate/step.", "Let the heels drop for a deep stretch.", "Drive up onto the toes as high as possible.", "Pause 1–2 sec at the bottom stretch each rep."], cues: ["Full stretch at the bottom", "Pause 1–2 sec down", "Rise high onto the toes", "Controlled tempo"] },
+  "Smith Overhead Press": { muscles: "Shoulders · Triceps · Upper Chest", howto: ["Set the Smith bar at shoulder height; grip just outside the shoulders.", "Stand tall, brace the core and glutes.", "Press the bar to full lockout overhead.", "Lower under control back to the shoulders."], cues: ["Stand tall, brace hard", "Press to full lockout", "Bar path over mid-foot", "Control the descent"] },
+  "Seated DB Shoulder Press": { muscles: "Shoulders · Triceps", howto: ["Sit with back support, dumbbells at shoulder height, palms forward.", "Brace the core and keep the wrists stacked over the elbows.", "Press overhead until the arms are nearly straight.", "Lower under control to shoulder height."], cues: ["Wrists over elbows", "Press overhead", "Don't over-arch the back", "Controlled eccentric"] },
+  "DB Rear-Delt Fly": { muscles: "Rear Delts · Upper Back", howto: ["Lie chest-down on an incline bench holding light dumbbells.", "Start with the arms hanging, slight elbow bend.", "Raise the weights out to the sides, leading with the elbows.", "Squeeze the rear delts, then lower slowly."], cues: ["Chest on the incline", "Lead with the elbows", "Squeeze the rear delts", "Light weight, strict form"] },
+  "Smith Shrug": { muscles: "Traps", howto: ["Hold the Smith bar at arm's length against your thighs.", "Keep the arms straight and chest tall.", "Shrug the shoulders straight up toward your ears.", "Pause 1 sec at the top, then lower under control."], cues: ["Straight up, not rolling", "1-sec pause at the top", "Arms stay straight", "Build the yoke"] },
+  "DB Wrist Curl": { muscles: "Forearm Flexors", howto: ["Rest your forearms on your thighs, palms up, wrists past the knees.", "Let the dumbbells roll to your fingertips.", "Curl the wrists up, squeezing the forearms.", "Lower slowly to a full stretch."], cues: ["Forearms stay planted", "Full stretch at the bottom", "Squeeze the forearms", "Slow and controlled"] },
+  "DB Reverse Curl": { muscles: "Forearm Extensors · Brachialis", howto: ["Hold the dumbbells with an overhand (palms-down) grip.", "Pin the elbows to your sides.", "Curl up without rotating the wrists, knuckles leading.", "Lower slowly to a full stretch."], cues: ["Overhand grip", "Elbows pinned", "Knuckles lead the way", "Strict, light, controlled"] },
+  "DB Floor Press": { muscles: "Chest · Triceps · Pressing Power", howto: ["Lie on the floor with dumbbells at chest level, knees bent.", "Let the upper arms rest lightly on the floor at the bottom.", "Press explosively to lockout.", "Lower under control until the triceps touch down, then press again."], cues: ["Triceps touch, no bounce", "Explosive press", "Stable shoulder blades", "Raw pressing power"] },
+  "DB Push Press": { muscles: "Shoulders · Triceps · Legs (drive)", howto: ["Hold dumbbells at shoulder height, feet hip-width.", "Dip slightly at the knees.", "Explode up, driving the dumbbells overhead using the leg drive.", "Lower under control to the shoulders and reset."], cues: ["Dip then drive", "Explosive total-body", "Lock out overhead", "Power, not grind"] },
+  "Conditioning Complex": { muscles: "Full Body · Engine", howto: ["Pick one complex and the same pair of dumbbells.", "Move through the sequence without setting the weights down.", "Keep rest minimal between rounds.", "Complete the target rounds with explosive, controlled intent."], cues: ["Never set the DBs down", "Minimal rest", "Explosive intent", "Build the engine"] },
+  "Hanging Leg Raise": { muscles: "Core · Hip Flexors", howto: ["Hang from the Smith bar with a firm grip.", "Brace the core and avoid swinging.", "Raise your legs (knees or straight) toward your chest.", "Lower under control without letting the body swing."], cues: ["No swinging", "Control up and down", "Brace the core", "Full range"] },
+  "Suitcase Carry": { muscles: "Core · Obliques · Grip", howto: ["Hold one heavy dumbbell at your side like a suitcase.", "Stand tall and resist leaning toward the weight.", "Walk with controlled steps, staying square.", "Carry the target distance, then switch sides."], cues: ["Resist the lean (anti-lateral-flexion)", "Tall and square", "Crush the handle", "Even on both sides"] },
+  "Plank": { muscles: "Core · Anti-Extension", howto: ["Set your forearms under your shoulders, body in a straight line.", "Brace the abs and squeeze the glutes.", "Keep the hips level — don't sag or pike.", "Hold for the target time, breathing steadily."], cues: ["Straight line head to heels", "Brace abs and glutes", "Hips level", "Breathe, don't hold breath"] },
 };
 
 const DEFAULT_WORKOUTS = {
@@ -48,6 +83,75 @@ const DEFAULT_WORKOUTS = {
     { id: "c6", name: "Cable Triceps Pushdown", sets: 3, targetReps: 12 },
     { id: "c7", name: "Biceps Curl", sets: 2, targetReps: 12 },
   ]},
+};
+
+// 4-week intensity wave for The Demon & The Sun
+const SUN_CYCLE = [
+  { phase: "Dawn", rpe: "RPE 7–8", note: "Groove the lifts, conservative loads", color: "#c4a96a" },
+  { phase: "Morning", rpe: "RPE 8", note: "Add load or reps", color: "#d4b87a" },
+  { phase: "High Noon — \"The One\"", rpe: "RPE 9", note: "Peak. Escanor at zenith. Go heavy.", color: "#e8cb8c" },
+  { phase: "Sunset (Deload)", rpe: "RPE 6–7", note: "Cut volume ~40–50%, keep the movements", color: "#b48cc8" },
+];
+
+// Preset programs. setKind drives logging: straight | noon | carry | complex.
+// group + groupLabel renders consecutive exercises together (supersets/circuits).
+const PROGRAMS = {
+  demonsun: {
+    name: "The Demon & The Sun",
+    subtitle: "Baki × Escanor · 5-Day · DB + Smith",
+    preset: true,
+    schema: "demonsun",
+    days: {
+      ds_d1: { name: "The Demon's Back", sigil: "⚔", channel: "The face of the demon lives in your back. Drive your elbows down and back like you're tearing the world in half.", exercises: [
+        { id: "ds_d1_e1", name: "Smith Bent-Over Row", setKind: "noon", ramp: 4, topReps: "5", backoffSets: 3, backoffReps: "8", backoffPct: 0.85, note: "Noon Lift — primary demon-back builder" },
+        { id: "ds_d1_e2", name: "Lat Pulldown", setKind: "straight", sets: 4, targetReps: "8–12", note: "wide pronated grip — width" },
+        { id: "ds_d1_e3", name: "Seated Cable Row", setKind: "straight", sets: 4, targetReps: "10–12", note: "thickness" },
+        { id: "ds_d1_e4", name: "Single-Arm DB Row", setKind: "straight", sets: 3, targetReps: "8–10", note: "per side" },
+        { id: "ds_d1_e5", name: "DB Pullover", setKind: "straight", sets: 3, targetReps: "12–15" },
+        { id: "ds_d1_e6", name: "DB Hammer Curl", setKind: "straight", sets: 3, targetReps: "10–12", group: "d1_arms", groupLabel: "Superset" },
+        { id: "ds_d1_e7", name: "DB Curl", setKind: "straight", sets: 3, targetReps: "10–12", group: "d1_arms", groupLabel: "Superset" },
+        { id: "ds_d1_e8", name: "Farmer's Carry", setKind: "carry", sets: 4, mode: "time", targetReps: "45–60 sec", note: "Baki's hands — heaviest DBs" },
+      ]},
+      ds_d2: { name: "The Sun at Its Zenith", sigil: "☀", channel: "\"I am the strongest.\" One blazing press at a time. The sun does not doubt itself.", exercises: [
+        { id: "ds_d2_e1", name: "Smith Incline Press", setKind: "noon", ramp: 4, topReps: "5", backoffSets: 3, backoffReps: "8", backoffPct: 0.85, note: "Noon Lift — upper-chest armor" },
+        { id: "ds_d2_e2", name: "Flat DB Press", setKind: "straight", sets: 4, targetReps: "8–12" },
+        { id: "ds_d2_e3", name: "Smith Pin Press", setKind: "straight", sets: 3, targetReps: "5", note: "dead stop from the pins" },
+        { id: "ds_d2_e4", name: "DB Lateral Raise", setKind: "straight", sets: 4, targetReps: "12–20" },
+        { id: "ds_d2_e5", name: "DB Overhead Extension", setKind: "straight", sets: 3, targetReps: "10–12", group: "d2_tri", groupLabel: "Superset" },
+        { id: "ds_d2_e6", name: "DB Skull Crusher", setKind: "straight", sets: 3, targetReps: "10–12", group: "d2_tri", groupLabel: "Superset" },
+        { id: "ds_d2_e7", name: "DB Close-Grip Press", setKind: "straight", sets: 2, targetReps: "AMRAP", note: "finisher — to failure" },
+      ]},
+      ds_d3: { name: "Pillars of Pride", sigil: "🛡", channel: "The foundation. Escanor stands unmoved; the grappler is rooted to the earth. There is no skipping this.", exercises: [
+        { id: "ds_d3_e1", name: "Smith Squat", setKind: "noon", ramp: 4, topReps: "5", backoffSets: 3, backoffReps: "8", backoffPct: 0.85, note: "Noon Lift — full depth you control" },
+        { id: "ds_d3_e2", name: "Leg Press", setKind: "straight", sets: 4, targetReps: "10–12", note: "push hard — bury the legs" },
+        { id: "ds_d3_e3", name: "Romanian Deadlift", setKind: "straight", sets: 4, targetReps: "8–10", note: "Smith or DB" },
+        { id: "ds_d3_e4", name: "Lying Leg Curl", setKind: "straight", sets: 4, targetReps: "10–12" },
+        { id: "ds_d3_e5", name: "Leg Extension", setKind: "straight", sets: 3, targetReps: "12–15" },
+        { id: "ds_d3_e6", name: "Smith Standing Calf Raise", setKind: "straight", sets: 4, targetReps: "12–15" },
+      ]},
+      ds_d4: { name: "Boulder Shoulders & Sacred Arms", sigil: "⛰", channel: "Escanor's mountainous frame and the grappler's yoke. Carry yourself like the sun carries the sky.", exercises: [
+        { id: "ds_d4_e1", name: "Smith Overhead Press", setKind: "noon", ramp: 4, topReps: "5", backoffSets: 3, backoffReps: "8", backoffPct: 0.85, note: "Noon Lift — press to full lockout" },
+        { id: "ds_d4_e2", name: "Seated DB Shoulder Press", setKind: "straight", sets: 4, targetReps: "8–12" },
+        { id: "ds_d4_e3", name: "DB Lateral Raise", setKind: "straight", sets: 4, targetReps: "15–20", note: "twice-weekly volume — the signature" },
+        { id: "ds_d4_e4", name: "DB Rear-Delt Fly", setKind: "straight", sets: 3, targetReps: "15–20", note: "chest on incline" },
+        { id: "ds_d4_e5", name: "Smith Shrug", setKind: "straight", sets: 4, targetReps: "12–15", note: "1-sec pause at top" },
+        { id: "ds_d4_e6", name: "DB Curl", setKind: "straight", sets: 3, targetReps: "10–12", group: "d4_arms", groupLabel: "Superset" },
+        { id: "ds_d4_e7", name: "DB Overhead Extension", setKind: "straight", sets: 3, targetReps: "10–12", group: "d4_arms", groupLabel: "Superset" },
+        { id: "ds_d4_e8", name: "DB Wrist Curl", setKind: "straight", sets: 3, targetReps: "12–15", group: "d4_fore", groupLabel: "Forearm Superset" },
+        { id: "ds_d4_e9", name: "DB Reverse Curl", setKind: "straight", sets: 3, targetReps: "12–15", group: "d4_fore", groupLabel: "Forearm Superset" },
+      ]},
+      ds_d5: { name: "\"The One\": High Noon", sigil: "✺", channel: "The climax. Escanor at \"The One\"; Baki stepping into the ring. Set your intention — then bring everything.", exercises: [
+        { id: "ds_d5_e1", name: "Smith Front Squat", setKind: "noon", ramp: 4, topReps: "3–5", backoffSets: 0, backoffReps: "", backoffPct: 0, note: "Noon Lift — heaviest output of the week" },
+        { id: "ds_d5_e2", name: "DB Floor Press", setKind: "straight", sets: 4, targetReps: "5", note: "raw pressing power" },
+        { id: "ds_d5_e3", name: "DB Romanian Deadlift", setKind: "straight", sets: 4, targetReps: "6", note: "hinge power" },
+        { id: "ds_d5_e4", name: "DB Push Press", setKind: "straight", sets: 3, targetReps: "5", note: "explosive, total-body" },
+        { id: "ds_d5_e5", name: "Conditioning Complex", setKind: "complex", rounds: 5, roundsTarget: "4–6 rounds", steps: ["6 DB RDL", "6 hang clean", "6 push press", "6 front-rack squat — never set the DBs down"] },
+        { id: "ds_d5_e6", name: "Hanging Leg Raise", setKind: "straight", sets: 3, targetReps: "12", group: "d5_core", groupLabel: "Core Circuit ×3" },
+        { id: "ds_d5_e7", name: "Suitcase Carry", setKind: "carry", sets: 3, mode: "distance", targetReps: "30 m", note: "per side", group: "d5_core", groupLabel: "Core Circuit ×3" },
+        { id: "ds_d5_e8", name: "Plank", setKind: "carry", sets: 3, mode: "time", targetReps: "45 sec", group: "d5_core", groupLabel: "Core Circuit ×3" },
+      ]},
+    },
+  },
 };
 
 // Tier-based rank system
@@ -552,6 +656,52 @@ function calcIronXP(ses) {
 
 function sessionVolume(ses) {
   return Object.values(ses).reduce((s,x)=>s+(parseFloat(x.weight)||0)*(parseFloat(x.reps)||0),0);
+}
+
+// Expand an exercise definition into ordered set-slot descriptors.
+// Keys are stable (`${id}-s${n}`) so a logged session maps back deterministically.
+function expandSets(ex) {
+  const kind = ex.setKind || "straight";
+  let slots = [];
+  if (kind === "noon") {
+    for (let i = 1; i <= (ex.ramp || 0); i++) slots.push({ kind: "ramp", label: `Ramp ${i}`, target: "ramp-up", field: "reps", optional: true });
+    slots.push({ kind: "top", label: "Top Set", target: ex.topReps, field: "reps" });
+    for (let i = 1; i <= (ex.backoffSets || 0); i++) slots.push({ kind: "backoff", label: `Back-off ${i}`, target: ex.backoffReps, field: "reps", suggestPct: ex.backoffPct });
+  } else if (kind === "carry") {
+    for (let i = 1; i <= (ex.sets || 1); i++) slots.push({ kind: "carry", label: `Set ${i}`, target: ex.targetReps, field: ex.mode === "time" ? "sec" : "m" });
+  } else if (kind === "complex") {
+    for (let i = 1; i <= (ex.rounds || 1); i++) slots.push({ kind: "round", label: `Round ${i}`, target: ex.roundsTarget, field: "done" });
+  } else {
+    for (let i = 1; i <= (ex.sets || 1); i++) slots.push({ kind: "straight", label: `S${i}`, target: ex.targetReps, field: "reps" });
+  }
+  return slots.map((s, i) => ({ ...s, key: `${ex.id}-s${i + 1}` }));
+}
+
+// Short header summary of an exercise's prescription.
+function targetSummary(ex) {
+  const kind = ex.setKind || "straight";
+  if (kind === "noon") {
+    const bo = ex.backoffSets ? ` + ${ex.backoffSets}×${ex.backoffReps}` : "";
+    return `Noon · ramp→1×${ex.topReps}${bo}`;
+  }
+  if (kind === "carry") return `${ex.sets}× ${ex.targetReps}`;
+  if (kind === "complex") return `${ex.rounds}× rounds · ${ex.roundsTarget || ""}`.trim();
+  return `${ex.sets}×${ex.targetReps}`;
+}
+
+// Look up a day definition across every program (history may reference a non-active program).
+function findDayDef(dayKey, programs) {
+  for (const prog of Object.values(programs || {})) {
+    if (prog?.days?.[dayKey]) return prog.days[dayKey];
+  }
+  return null;
+}
+
+// 0-based current week within the 4-week Sun Cycle, from an anchor date.
+function cycleWeekIndex(anchorISO) {
+  if (!anchorISO) return 0;
+  const days = Math.floor((Date.now() - new Date(anchorISO).getTime()) / 86400000);
+  return ((Math.floor(days / 7) % 4) + 4) % 4;
 }
 
 function calcHabitStreak(habitLog, habitId) {
@@ -1244,23 +1394,6 @@ function ProgressionChart({ history, exerciseId, pr }) {
   );
 }
 
-function ExerciseDiagram({ movement }) {
-  const d = {
-    push: (<svg viewBox="0 0 200 120" style={{width:"100%",height:"120px"}}><circle cx="60" cy="40" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="60" y1="50" x2="60" y2="90" stroke="#c4a96a" strokeWidth="2"/><line x1="60" y1="90" x2="45" y2="110" stroke="#c4a96a" strokeWidth="2"/><line x1="60" y1="90" x2="75" y2="110" stroke="#c4a96a" strokeWidth="2"/><rect x="130" y="50" width="20" height="20" fill="none" stroke="#8b7a5e" strokeWidth="1.5" className="weight-push"/></svg>),
-    overhead: (<svg viewBox="0 0 200 140" style={{width:"100%",height:"140px"}}><circle cx="100" cy="60" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="70" x2="100" y2="115" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="115" x2="85" y2="135" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="115" x2="115" y2="135" stroke="#c4a96a" strokeWidth="2"/><g className="arm-overhead"><line x1="100" y1="75" x2="75" y2="50" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="75" x2="125" y2="50" stroke="#c4a96a" strokeWidth="2"/><rect x="65" y="40" width="20" height="10" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/><rect x="115" y="40" width="20" height="10" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    pulldown: (<svg viewBox="0 0 200 140" style={{width:"100%",height:"140px"}}><line x1="100" y1="0" x2="100" y2="20" stroke="#4a4236" strokeWidth="1.5" strokeDasharray="3,3"/><circle cx="100" cy="60" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="70" x2="100" y2="115" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="115" x2="85" y2="135" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="115" x2="115" y2="135" stroke="#c4a96a" strokeWidth="2"/><g className="arm-pulldown"><line x1="100" y1="75" x2="75" y2="50" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="75" x2="125" y2="50" stroke="#c4a96a" strokeWidth="2"/><line x1="70" y1="45" x2="130" y2="45" stroke="#8b7a5e" strokeWidth="2"/></g></svg>),
-    row: (<svg viewBox="0 0 200 120" style={{width:"100%",height:"120px"}}><circle cx="50" cy="50" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="60" x2="50" y2="95" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="95" x2="80" y2="95" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="95" x2="40" y2="115" stroke="#c4a96a" strokeWidth="2"/><line x1="80" y1="95" x2="80" y2="115" stroke="#c4a96a" strokeWidth="2"/><g className="arm-row"><line x1="50" y1="65" x2="90" y2="65" stroke="#c4a96a" strokeWidth="2"/><rect x="88" y="58" width="20" height="14" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    curl: (<svg viewBox="0 0 200 140" style={{width:"100%",height:"140px"}}><circle cx="100" cy="40" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="50" x2="100" y2="105" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="105" x2="85" y2="130" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="105" x2="115" y2="130" stroke="#c4a96a" strokeWidth="2"/><line x1="85" y1="60" x2="85" y2="80" stroke="#c4a96a" strokeWidth="2"/><line x1="115" y1="60" x2="115" y2="80" stroke="#c4a96a" strokeWidth="2"/><g className="arm-curl" style={{transformOrigin:"85px 80px"}}><line x1="85" y1="80" x2="85" y2="105" stroke="#c4a96a" strokeWidth="2"/><rect x="78" y="105" width="14" height="14" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g><g className="arm-curl" style={{transformOrigin:"115px 80px"}}><line x1="115" y1="80" x2="115" y2="105" stroke="#c4a96a" strokeWidth="2"/><rect x="108" y="105" width="14" height="14" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    tricep: (<svg viewBox="0 0 200 140" style={{width:"100%",height:"140px"}}><circle cx="100" cy="30" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="40" x2="100" y2="95" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="95" x2="85" y2="125" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="95" x2="115" y2="125" stroke="#c4a96a" strokeWidth="2"/><line x1="85" y1="45" x2="85" y2="65" stroke="#c4a96a" strokeWidth="2"/><line x1="115" y1="45" x2="115" y2="65" stroke="#c4a96a" strokeWidth="2"/><g className="arm-tricep"><line x1="85" y1="65" x2="85" y2="95" stroke="#c4a96a" strokeWidth="2"/><line x1="115" y1="65" x2="115" y2="95" stroke="#c4a96a" strokeWidth="2"/><rect x="78" y="92" width="14" height="10" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/><rect x="108" y="92" width="14" height="10" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    legpress: (<svg viewBox="0 0 200 120" style={{width:"100%",height:"120px"}}><circle cx="40" cy="60" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="60" x2="80" y2="60" stroke="#c4a96a" strokeWidth="2"/><g className="leg-press"><line x1="80" y1="60" x2="130" y2="60" stroke="#c4a96a" strokeWidth="2"/><line x1="130" y1="60" x2="155" y2="60" stroke="#c4a96a" strokeWidth="2"/><rect x="155" y="35" width="15" height="50" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    legext: (<svg viewBox="0 0 200 120" style={{width:"100%",height:"120px"}}><circle cx="50" cy="40" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="50" x2="50" y2="75" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="75" x2="90" y2="75" stroke="#c4a96a" strokeWidth="2"/><g className="leg-ext" style={{transformOrigin:"90px 75px"}}><line x1="90" y1="75" x2="90" y2="110" stroke="#c4a96a" strokeWidth="2"/><rect x="83" y="108" width="14" height="8" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    legcurl: (<svg viewBox="0 0 200 120" style={{width:"100%",height:"120px"}}><circle cx="50" cy="40" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="50" x2="50" y2="75" stroke="#c4a96a" strokeWidth="2"/><line x1="50" y1="75" x2="100" y2="75" stroke="#c4a96a" strokeWidth="2"/><g className="leg-curl" style={{transformOrigin:"100px 75px"}}><line x1="100" y1="75" x2="140" y2="75" stroke="#c4a96a" strokeWidth="2"/><rect x="138" y="68" width="10" height="14" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    lateral: (<svg viewBox="0 0 200 140" style={{width:"100%",height:"140px"}}><circle cx="100" cy="40" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="50" x2="100" y2="100" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="100" x2="85" y2="130" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="100" x2="115" y2="130" stroke="#c4a96a" strokeWidth="2"/><g className="arm-lateral"><line x1="100" y1="55" x2="65" y2="55" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="55" x2="135" y2="55" stroke="#c4a96a" strokeWidth="2"/><rect x="55" y="48" width="14" height="14" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/><rect x="131" y="48" width="14" height="14" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g></svg>),
-    facepull: (<svg viewBox="0 0 200 140" style={{width:"100%",height:"140px"}}><circle cx="100" cy="50" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="60" x2="100" y2="105" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="105" x2="85" y2="130" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="105" x2="115" y2="130" stroke="#c4a96a" strokeWidth="2"/><g className="arm-facepull"><line x1="100" y1="55" x2="80" y2="45" stroke="#c4a96a" strokeWidth="2"/><line x1="100" y1="55" x2="120" y2="45" stroke="#c4a96a" strokeWidth="2"/><line x1="75" y1="45" x2="125" y2="45" stroke="#8b7a5e" strokeWidth="2"/></g></svg>),
-    pallof: (<svg viewBox="0 0 200 140" style={{width:"100%",height:"140px"}}><circle cx="80" cy="50" r="10" fill="none" stroke="#c4a96a" strokeWidth="2"/><line x1="80" y1="60" x2="80" y2="105" stroke="#c4a96a" strokeWidth="2"/><line x1="80" y1="105" x2="65" y2="130" stroke="#c4a96a" strokeWidth="2"/><line x1="80" y1="105" x2="95" y2="130" stroke="#c4a96a" strokeWidth="2"/><g className="arm-pallof"><line x1="80" y1="65" x2="140" y2="65" stroke="#c4a96a" strokeWidth="2"/><rect x="135" y="58" width="14" height="14" fill="none" stroke="#8b7a5e" strokeWidth="1.5"/></g><line x1="180" y1="40" x2="180" y2="90" stroke="#4a4236" strokeWidth="1.5" strokeDasharray="3,3"/></svg>),
-  };
-  return d[movement] || d.push;
-}
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN APP
@@ -1273,7 +1406,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   // Core state
-  const [workouts, setWorkouts] = useState(DEFAULT_WORKOUTS);
+  const [programs, setPrograms] = useState({ classic: { name: "The Foundation", preset: false, days: DEFAULT_WORKOUTS }, demonsun: PROGRAMS.demonsun });
+  const [activeProgramId, setActiveProgramId] = useState("classic");
+  const [cycleState, setCycleState] = useState({}); // { [programId]: { anchor: ISO } }
+  const workouts = programs[activeProgramId]?.days || {};
   const [medTypes, setMedTypes] = useState(DEFAULT_MED_TYPES);
   const [medDurationPresets, setMedDurationPresets] = useState(MEDITATION_PRESETS);
   const [bodyLog, setBodyLog] = useState([]);
@@ -1346,7 +1482,7 @@ export default function App() {
 
   // Load user data
   useEffect(() => { if (!user) return; (async () => {
-    const [h, lw, pr, ix, dx, mx, hb, hl, md, ua, dq, wq, qc, asc, chc, cw, cmt, cmdp, bl, tm, lf, rn, sx, ap, bk, rs, lxp, st] = await Promise.all([
+    const [h, lw, pr, ix, dx, mx, hb, hl, md, ua, dq, wq, qc, asc, chc, cw, cmt, cmdp, bl, tm, lf, rn, sx, ap, bk, rs, lxp, st, savedProgs, savedActiveProg, savedCycle] = await Promise.all([
       load(user, "history", []), load(user, "lastWeights", {}), load(user, "prs", {}),
       load(user, "ironXP", 0), load(user, "discXP", 0), load(user, "mindXP", 0),
       load(user, "habits", PRESET_HABITS.slice(0,3)), load(user, "habitLog", {}),
@@ -1367,17 +1503,35 @@ export default function App() {
       load(user, "readingSessions", []),
       load(user, "loreXP", 0),
       load(user, "stallThreshold", "standard"),
+      load(user, "programs", null),
+      load(user, "activeProgramId", "classic"),
+      load(user, "cycleState", {}),
     ]);
     setHistory(h); setLastWeights(lw); setPrs(pr);
     setIronXP(ix); setDiscXP(dx); setMindXP(mx);
     setHabits(hb); setHabitLog(hl); setMeditations(md);
     setUnlockedAchievements(ua); setDailyQuests(dq); setWeeklyQuest(wq);
     setQuestsCompleted(qc); setAscensions(asc); setCustomHabitsCreated(chc);
-    setWorkouts(cw); setMedTypes(cmt); setMedDurationPresets(cmdp);
+    setMedTypes(cmt); setMedDurationPresets(cmdp);
     setBodyLog(bl); setTrackedMetrics(tm); setLogFrequency(lf);
     setRuns(rn); setStrideXP(sx); setActiveProgram(ap);
     setBooks(bk); setReadingSessions(rs); setLoreXP(lxp);
     setStallThreshold(st);
+    // Programs: migrate legacy flat `workouts` into the program registry on first load.
+    // Always refresh the demonsun preset from code so content updates ship.
+    let progs;
+    if (savedProgs && savedProgs.classic) {
+      progs = { ...savedProgs, demonsun: JSON.parse(JSON.stringify(PROGRAMS.demonsun)) };
+    } else {
+      progs = {
+        classic: { name: "The Foundation", preset: false, days: cw || DEFAULT_WORKOUTS },
+        demonsun: JSON.parse(JSON.stringify(PROGRAMS.demonsun)),
+      };
+      await save(user, "programs", progs);
+    }
+    setPrograms(progs);
+    setActiveProgramId(progs[savedActiveProg] ? savedActiveProg : "classic");
+    setCycleState(savedCycle || {});
     // Generate quests if needed
     refreshQuests(dq, wq);
     // Check for unseen monthly chronicle
@@ -1412,6 +1566,27 @@ export default function App() {
       setWeeklyQuest(newWQ); await save(user, "weeklyQuest", newWQ);
     }
   }
+
+  // ─── PROGRAMS ───
+  // Persist a new days-object into the active (editable) program.
+  const updateActiveDays = async (nw) => {
+    const np = { ...programs, [activeProgramId]: { ...programs[activeProgramId], days: nw } };
+    setPrograms(np);
+    await save(user, "programs", np);
+  };
+  const switchProgram = async (id) => {
+    setActiveProgramId(id);
+    await save(user, "activeProgramId", id);
+    // Anchor the Sun Cycle the first time a program is opened.
+    if (id === "demonsun" && !cycleState.demonsun?.anchor) {
+      const ncs = { ...cycleState, demonsun: { anchor: new Date().toISOString() } };
+      setCycleState(ncs); await save(user, "cycleState", ncs);
+    }
+  };
+  const restartCycle = async (id) => {
+    const ncs = { ...cycleState, [id]: { anchor: new Date().toISOString() } };
+    setCycleState(ncs); await save(user, "cycleState", ncs);
+  };
 
   // Rest timer
   useEffect(() => {
@@ -1506,22 +1681,42 @@ export default function App() {
   // ─── IRON ───
   const startWorkout = (dk) => {
     const w = workouts[dk]; const s = {};
-    w.exercises.forEach(ex => { for(let i=1;i<=ex.sets;i++) s[`${ex.id}-s${i}`]={weight: i === 1 ? (lastWeights[ex.id]||"") : "", reps:"", done:false}; });
+    w.exercises.forEach(ex => {
+      let prefilled = false;
+      expandSets(ex).forEach(slot => {
+        let weight = "";
+        if (!prefilled && (slot.kind === "straight" || slot.kind === "top" || slot.kind === "carry")) {
+          weight = lastWeights[ex.id] || ""; prefilled = true;
+        }
+        s[slot.key] = { weight, reps: "", done: false };
+      });
+    });
     setSession(s); setActiveDay(dk); setView("iron-workout");
   };
   const updateSet = (k,f,v) => setSession(p => {
     const updated = {...p,[k]:{...p[k],[f]:v}};
-    // Smart carry-forward: if updating weight, fill all later empty sets of same exercise with the new weight
     if (f === "weight" && v) {
-      const [exId, setPart] = k.split("-s");
-      const setNum = parseInt(setPart);
-      Object.keys(updated).forEach(otherKey => {
-        if (otherKey === k) return;
-        const [otherExId, otherSetPart] = otherKey.split("-s");
-        if (otherExId === exId && parseInt(otherSetPart) > setNum && !updated[otherKey].weight) {
-          updated[otherKey] = {...updated[otherKey], weight: v};
-        }
-      });
+      const exId = k.split("-s")[0];
+      const ex = (workouts[activeDay]?.exercises || []).find(e => e.id === exId);
+      const slots = ex ? expandSets(ex) : [];
+      const changed = slots.find(s => s.key === k);
+      if (changed && changed.kind === "top") {
+        // Noon Lift: auto-suggest back-off load from the top set.
+        slots.filter(s => s.kind === "backoff").forEach(s => {
+          if (!updated[s.key]?.weight) {
+            const sug = Math.round((parseFloat(v) || 0) * (s.suggestPct || 0.85));
+            if (sug > 0) updated[s.key] = {...updated[s.key], weight: String(sug)};
+          }
+        });
+      } else if (changed && (changed.kind === "straight" || changed.kind === "carry")) {
+        // Carry the weight forward to later empty same-kind slots of this exercise.
+        const idx = slots.findIndex(s => s.key === k);
+        slots.forEach((s, i) => {
+          if (i > idx && s.kind === changed.kind && !updated[s.key]?.weight) {
+            updated[s.key] = {...updated[s.key], weight: v};
+          }
+        });
+      }
     }
     return updated;
   });
@@ -1532,13 +1727,15 @@ export default function App() {
     const nw = {...lastWeights};
     const nPrs = {...prs};
     workouts[activeDay].exercises.forEach(ex => {
-      const setKey = `${ex.id}-s1`;
-      if(session[setKey]?.weight) nw[ex.id]=session[setKey].weight;
-      // Update PRs
-      for (let i = 1; i <= ex.sets; i++) {
-        const s = session[`${ex.id}-s${i}`];
-        if (s?.done) { const w = parseFloat(s.weight) || 0; if (w > (nPrs[ex.id] || 0)) nPrs[ex.id] = w; }
-      }
+      const slots = expandSets(ex);
+      // lastWeights from the first real work slot (S1 / top set / first carry).
+      const firstWork = slots.find(s => s.kind === "straight" || s.kind === "top" || s.kind === "carry");
+      if (firstWork && session[firstWork.key]?.weight) nw[ex.id] = session[firstWork.key].weight;
+      // PRs: heaviest completed slot.
+      slots.forEach(s => {
+        const ss = session[s.key];
+        if (ss?.done) { const wgt = parseFloat(ss.weight) || 0; if (wgt > (nPrs[ex.id] || 0)) nPrs[ex.id] = wgt; }
+      });
     });
     const baseXP = calcIronXP(session);
     const syn = applySynergy(baseXP, "iron", { history, meditations, habits, habitLog, readingSessions, runs });
@@ -1989,45 +2186,122 @@ export default function App() {
   // ═════════════════════════════════════════════════════
   // IRON VIEWS
   // ═════════════════════════════════════════════════════
-  if (view === "iron-home") return (
+  if (view === "iron-home") {
+    const activeProg = programs[activeProgramId] || {};
+    const progEntries = Object.entries(programs);
+    const cyc = activeProgramId === "demonsun" ? SUN_CYCLE[cycleWeekIndex(cycleState.demonsun?.anchor)] : null;
+    return (
     <div style={S.c}>
       <AnimStyles/>
       <div style={S.wH}><button style={S.bk} onClick={()=>setView("home")}>‹</button><h2 style={{...S.wT,flex:1}}>⚔ Iron</h2><button style={S.gearBtn} onClick={()=>setView("iron-settings")}>⚙</button></div>
       <RankCard rank={iron} xp={ironXP} pillar="iron"/>
-      <div style={S.dv}>━━━ ◈ ━━━</div>
-      <div style={S.dGrid}>{Object.entries(workouts).map(([k,w])=>(<button key={k} style={S.dCard} onClick={()=>startWorkout(k)}><div style={S.dCardL}><span style={S.dSig}>{w.sigil}</span><div><span style={S.dName}>{w.name}</span><span style={S.dCnt}>{w.exercises.length} exercises</span></div></div><span style={S.dArr}>▸</span></button>))}</div>
+
+      <div style={{...S.subTabs, gridTemplateColumns:`repeat(${progEntries.length},1fr)`, marginTop:"16px"}}>
+        {progEntries.map(([id, prog]) => (
+          <button key={id} style={{...S.subTab, ...(activeProgramId === id ? S.subTabActive : {})}} onClick={()=>switchProgram(id)}>{prog.name}</button>
+        ))}
+      </div>
+
+      {activeProg.subtitle && <p style={S.progSubtitle}>{activeProg.subtitle}</p>}
+
+      {cyc && (
+        <div style={{...S.cycleBanner, borderColor: cyc.color + "55"}}>
+          <div style={S.cycleBannerTop}>
+            <span style={{...S.cyclePhase, color: cyc.color}}>☀ {cyc.phase}</span>
+            <span style={S.cycleRpe}>{cyc.rpe}</span>
+          </div>
+          <div style={S.cycleBannerBot}>
+            <span style={S.cycleNote}>Week {cycleWeekIndex(cycleState.demonsun?.anchor)+1}/4 · {cyc.note}</span>
+            <button style={S.cycleRestart} onClick={()=>restartCycle("demonsun")}>↻ Restart</button>
+          </div>
+        </div>
+      )}
+
+      <div style={S.dGrid}>{Object.entries(workouts).map(([k,w])=>(<button key={k} style={S.dCard} onClick={()=>startWorkout(k)}><div style={S.dCardL}><span style={S.dSig}>{w.sigil}</span><div style={{flex:1}}><span style={S.dName}>{w.name}</span><span style={S.dCnt}>{w.exercises.length} exercises{w.channel?" · tap to read":""}</span></div></div><span style={S.dArr}>▸</span></button>))}</div>
       <div style={S.navR}>
         <button style={S.navB} onClick={()=>setView("iron-history")}>◆ History</button>
         <button style={S.navB} onClick={()=>setView("iron-ranks")}>◈ Ranks</button>
       </div>
     </div>
-  );
+    );
+  }
 
-  if (view === "iron-workout") { const w=workouts[activeDay]; const cs=Object.values(session).filter(s=>s.done).length; const ts=Object.values(session).length; return (
+  if (view === "iron-workout") {
+    const w = workouts[activeDay];
+    const cs = Object.values(session).filter(s=>s.done).length;
+    const ts = Object.values(session).length;
+    const cyc = activeProgramId === "demonsun" ? SUN_CYCLE[cycleWeekIndex(cycleState.demonsun?.anchor)] : null;
+    // Group consecutive same-`group` exercises (supersets / circuits).
+    const groups = [];
+    w.exercises.forEach(ex => {
+      const last = groups[groups.length-1];
+      if (ex.group && last && last.group === ex.group) last.items.push(ex);
+      else groups.push({ group: ex.group || ex.id, label: ex.group ? ex.groupLabel : null, items: [ex] });
+    });
+    const renderExercise = (ex) => {
+      const slots = expandSets(ex);
+      const isNoon = ex.setKind === "noon";
+      return (
+        <div key={ex.id}>
+          <div style={S.exH}>
+            <button style={S.exNameBtn} onClick={()=>{setActiveExercise(ex);setView("exercise-detail");}}>{ex.name} <span style={S.infoTag}>ⓘ</span></button>
+            <span style={S.exTg}>{targetSummary(ex)}{ex.note?` · ${ex.note}`:""}</span>
+          </div>
+          {isNoon && cyc && <div style={S.noonRpe}>☀ Today: {cyc.rpe} — {cyc.phase}</div>}
+          {ex.setKind === "complex" && ex.steps && (
+            <div style={S.complexSteps}>{ex.steps.map((st,i)=>(<div key={i} style={S.complexStep}>• {st}</div>))}</div>
+          )}
+          <div style={S.stC}>{slots.map(slot=>{
+            const k = slot.key; const s = session[k] || {weight:"",reps:"",done:false};
+            const dim = slot.kind === "ramp";
+            if (slot.field === "done") {
+              return (<div key={k} style={{...S.sR,...(s.done?S.sRD:{})}}><span style={S.sLwide}>{slot.label}</span><span style={S.slotTarget}>{slot.target}</span><button style={{...S.chk,...(s.done?S.chkD:{})}} onClick={()=>toggleDone(k)}>{s.done?"✓":"○"}</button></div>);
+            }
+            const unit = slot.field === "reps" ? "reps" : slot.field; // sec | m | reps
+            return (<div key={k} style={{...S.sR,...(s.done?S.sRD:{}),...(dim?S.sRramp:{})}}>
+              <span style={S.sLwide}>{slot.label}</span>
+              <input style={S.inp} type="number" inputMode="numeric" placeholder="lbs" value={s.weight} onChange={e=>updateSet(k,"weight",e.target.value)}/>
+              <span style={S.sep}>×</span>
+              <input style={S.inp} type="number" inputMode="numeric" placeholder={slot.target||unit} value={s.reps} onChange={e=>updateSet(k,"reps",e.target.value)}/>
+              <span style={S.unitLbl}>{unit}</span>
+              <button style={{...S.chk,...(s.done?S.chkD:{})}} onClick={()=>toggleDone(k)}>{s.done?"✓":"○"}</button>
+            </div>);
+          })}</div>
+        </div>
+      );
+    };
+    return (
     <div style={S.c}>
       <AnimStyles/>
       <div style={S.wH}><button style={S.bk} onClick={()=>setView("iron-home")}>✕</button><div style={{flex:1}}><h2 style={S.wT}>{w.sigil} {w.name}</h2><p style={S.pTx}>{cs}/{ts} sets · ~{calcIronXP(session)} XP</p></div></div>
-      <div style={S.pBg}><div style={{...S.pFl,width:`${(cs/ts)*100}%`}}/></div>
+      {w.channel && <div style={S.channelBox}><span style={S.channelLabel}>Channel</span><span style={S.channelText}>{w.channel}</span></div>}
+      <div style={S.pBg}><div style={{...S.pFl,width:`${ts?(cs/ts)*100:0}%`}}/></div>
       {restTimer!==null&&<div style={S.rBan}><span style={S.rTx}>Rest — {restSeconds}s</span><button style={S.rSk} onClick={()=>{setRestTimer(null);setRestSeconds(0);}}>Skip</button></div>}
-      <div style={S.exL}>{w.exercises.map(ex=>(<div key={ex.id} style={S.exC}>
-        <div style={S.exH}><button style={S.exNameBtn} onClick={()=>{setActiveExercise(ex);setView("exercise-detail");}}>{ex.name} <span style={S.infoTag}>ⓘ</span></button><span style={S.exTg}>{ex.sets}×{ex.targetReps}{ex.note?` (${ex.note})`:""}</span></div>
-        <div style={S.stC}>{Array.from({length:ex.sets},(_,i)=>{const k=`${ex.id}-s${i+1}`;const s=session[k];return(<div key={k} style={{...S.sR,...(s.done?S.sRD:{})}}><span style={S.sL}>S{i+1}</span><input style={S.inp} type="number" inputMode="numeric" placeholder="lbs" value={s.weight} onChange={e=>updateSet(k,"weight",e.target.value)}/><span style={S.sep}>×</span><input style={S.inp} type="number" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(k,"reps",e.target.value)}/><button style={{...S.chk,...(s.done?S.chkD:{})}} onClick={()=>toggleDone(k)}>{s.done?"✓":"○"}</button></div>);})}</div>
-      </div>))}</div>
+      <div style={S.exL}>{groups.map((g,gi)=>(
+        <div key={gi} style={S.exC}>
+          {g.label && <div style={S.supersetHead}>⊃ {g.label}</div>}
+          {g.items.map((ex,ei)=>(<div key={ex.id}>{ei>0 && <div style={S.supersetDivider}/>}{renderExercise(ex)}</div>))}
+        </div>
+      ))}</div>
       <button style={{...S.finB,opacity:cs===0?0.4:1}} onClick={finishWorkout} disabled={cs===0}>◆ Finish & Record ◆</button>
     </div>
-  );}
+    );
+  }
 
-  if (view === "exercise-detail" && activeExercise) { const info = EXERCISE_INFO[activeExercise.name] || { movement:"push", cues:["Form info unavailable"] }; const pr = prs[activeExercise.id]; return (
+  if (view === "exercise-detail" && activeExercise) { const info = EXERCISE_INFO[activeExercise.name] || { muscles:"", howto:[], cues:["Form info unavailable"] }; const pr = prs[activeExercise.id]; return (
     <div style={S.c}>
       <AnimStyles/>
-      <div style={S.wH}><button style={S.bk} onClick={()=>setView("iron-workout")}>‹</button><h2 style={S.wT}>{activeExercise.name}</h2></div>
-      <div style={S.diagramBox}><ExerciseDiagram movement={info.movement}/></div>
+      <div style={S.wH}><button style={S.bk} onClick={()=>setView("iron-workout")}>‹</button><div style={{flex:1}}><h2 style={S.wT}>{activeExercise.name}</h2>{info.muscles && <p style={S.exMuscles}>{info.muscles}</p>}</div></div>
       {pr && <div style={S.prBox}><span style={S.prLbl}>Personal Record</span><span style={S.prVal}>{pr} lbs</span></div>}
+      {info.howto && info.howto.length > 0 && <>
+        <div style={S.cueHeader}>◆ How to Perform</div>
+        <div style={S.cueList}>{info.howto.map((c,i)=>(<div key={i} style={S.cueRow}><span style={S.cueNum}>{i+1}</span><span style={S.cueText}>{c}</span></div>))}</div>
+      </>}
+      <div style={S.cueHeader}>◆ Form Cues</div>
+      <div style={S.cueList}>{info.cues.map((c,i)=>(<div key={i} style={S.cueRow}><span style={S.cueNum}>›</span><span style={S.cueText}>{c}</span></div>))}</div>
       <div style={S.cueHeader}>◆ Progression</div>
       <ProgressionChart history={history} exerciseId={activeExercise.id} pr={pr}/>
-      <div style={S.cueHeader}>◆ Form Cues</div>
-      <div style={S.cueList}>{info.cues.map((c,i)=>(<div key={i} style={S.cueRow}><span style={S.cueNum}>{i+1}</span><span style={S.cueText}>{c}</span></div>))}</div>
-      <div style={S.targetBox}><span style={S.targetLbl}>Target</span><span style={S.targetVal}>{activeExercise.sets} × {activeExercise.targetReps}{activeExercise.note?` (${activeExercise.note})`:""}</span></div>
+      <div style={S.targetBox}><span style={S.targetLbl}>Target</span><span style={S.targetVal}>{targetSummary(activeExercise)}{activeExercise.note?` · ${activeExercise.note}`:""}</span></div>
       <button style={S.hmB} onClick={()=>setView("iron-workout")}>Return to Workout</button>
     </div>
   );}
@@ -2082,7 +2356,7 @@ export default function App() {
             <div style={S.hL}>
               {history.length === 0 && <p style={S.emp}>No sessions yet.</p>}
               {history.map((e, i) => {
-                const w = workouts[e.day];
+                const w = findDayDef(e.day, programs) || workouts[e.day];
                 if (!w) return null;
                 const sets = Object.values(e.sets || {});
                 const d = sets.filter(s => s.done).length;
@@ -2164,9 +2438,9 @@ export default function App() {
 
   if (view === "iron-ranks") return <RanksView ranks={IRON_RANKS} currentLvl={iron.current.level} currentXP={ironXP} title="⚔ Ranks of Iron" onBack={()=>setView("iron-home")}/>;
 
-  if (view === "iron-settings") return <IronSettings workouts={workouts} sigils={DEFAULT_SIGILS} onSave={async (nw)=>{setWorkouts(nw);await save(user,"workouts",nw);setView("iron-home");}} onEditDay={(nw,k)=>{setWorkouts(nw);save(user,"workouts",nw);setView("iron-edit-day:"+k);}} onBack={()=>setView("iron-home")}/>;
+  if (view === "iron-settings") return <IronSettings workouts={workouts} sigils={DEFAULT_SIGILS} preset={!!programs[activeProgramId]?.preset} programName={programs[activeProgramId]?.name} onSave={async (nw)=>{await updateActiveDays(nw);setView("iron-home");}} onEditDay={async (nw,k)=>{await updateActiveDays(nw);setView("iron-edit-day:"+k);}} onBack={()=>setView("iron-home")}/>;
 
-  if (view.startsWith("iron-edit-day:")) { const dayKey = view.split(":")[1]; const day = workouts[dayKey]; if (!day) { setView("iron-settings"); return null; } return <IronEditDay dayKey={dayKey} day={day} workouts={workouts} sigils={DEFAULT_SIGILS} onSave={async (nw)=>{setWorkouts(nw);await save(user,"workouts",nw);}} onBack={()=>setView("iron-settings")}/>;}
+  if (view.startsWith("iron-edit-day:")) { const dayKey = view.split(":")[1]; const day = workouts[dayKey]; if (!day) { setView("iron-settings"); return null; } return <IronEditDay dayKey={dayKey} day={day} workouts={workouts} sigils={DEFAULT_SIGILS} onSave={async (nw)=>{await updateActiveDays(nw);}} onBack={()=>setView("iron-settings")}/>;}
 
   // ═════════════════════════════════════════════════════
   // DISCIPLINE VIEWS
@@ -2476,10 +2750,37 @@ function SummaryView({ icon, pillar, pillarColor, title, date, leveledUp, newRan
   );
 }
 
-function IronSettings({ workouts, sigils, onSave, onEditDay, onBack }) {
+function IronSettings({ workouts, sigils, onSave, onEditDay, onBack, preset, programName }) {
   const [w, setW] = useState(JSON.parse(JSON.stringify(workouts)));
   const [newDayName, setNewDayName] = useState("");
   const [newDaySigil, setNewDaySigil] = useState("✦");
+
+  if (preset) {
+    return (
+      <div style={S.c}>
+        <AnimStyles/>
+        <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>⚙ Workout Settings</h2></div>
+        <div style={S.presetNotice}>
+          <span style={S.presetNoticeIcon}>🔒</span>
+          <div>
+            <div style={S.presetNoticeTitle}>{programName} is a preset program</div>
+            <div style={S.presetNoticeText}>Its days and exercises are fixed by design. Switch to an editable program (e.g. The Foundation) to customize days.</div>
+          </div>
+        </div>
+        <div style={S.sectionHead}>Days in this program</div>
+        <div style={S.settingsList}>
+          {Object.entries(w).map(([k, day]) => (
+            <div key={k} style={S.settingsRow}>
+              <span style={S.settingsRowIcon}>{day.sigil}</span>
+              <span style={{...S.settingsRowText, flex:1}}>{day.name}</span>
+              <span style={S.settingsRowMeta}>{day.exercises.length} ex</span>
+            </div>
+          ))}
+        </div>
+        <button style={{...S.authBack,marginTop:"8px"}} onClick={onBack}>Back</button>
+      </div>
+    );
+  }
 
   const addDay = () => {
     if (!newDayName.trim()) return;
@@ -4549,4 +4850,29 @@ const S = {
   thresholdBtnActive:{background:"rgba(196,169,106,0.1)",border:"1px solid rgba(196,169,106,0.35)",color:"#c4a96a"},
   thresholdBtnLbl:{fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",fontWeight:"600"},
   thresholdBtnDesc:{fontSize:"10px",letterSpacing:"1px",opacity:0.8},
+  progSubtitle:{fontSize:"11px",color:"#6b6252",letterSpacing:"2px",textAlign:"center",textTransform:"uppercase",margin:"8px 0 4px 0"},
+  cycleBanner:{padding:"12px 14px",background:"linear-gradient(135deg,rgba(196,169,106,0.08),rgba(180,140,200,0.05))",border:"1px solid rgba(196,169,106,0.3)",borderRadius:"10px",margin:"12px 0",display:"flex",flexDirection:"column",gap:"6px"},
+  cycleBannerTop:{display:"flex",justifyContent:"space-between",alignItems:"baseline"},
+  cyclePhase:{fontSize:"14px",fontWeight:"600",letterSpacing:"1px"},
+  cycleRpe:{fontSize:"12px",color:"#e8dcc8",letterSpacing:"1px",fontWeight:"600"},
+  cycleBannerBot:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px"},
+  cycleNote:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"1px",flex:1},
+  cycleRestart:{background:"none",border:"1px solid rgba(196,169,106,0.3)",color:"#8b7a5e",fontFamily:"inherit",fontSize:"11px",padding:"4px 10px",borderRadius:"6px",cursor:"pointer",flexShrink:0},
+  channelBox:{padding:"12px 14px",background:"rgba(180,140,200,0.06)",border:"1px solid rgba(180,140,200,0.18)",borderRadius:"10px",marginBottom:"12px"},
+  channelLabel:{fontSize:"10px",color:"#b48cc8",letterSpacing:"3px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
+  channelText:{fontSize:"13px",color:"#d4c9a8",lineHeight:"1.5",fontStyle:"italic"},
+  noonRpe:{fontSize:"11px",color:"#e8cb8c",letterSpacing:"1px",margin:"2px 0 8px 0"},
+  complexSteps:{display:"flex",flexDirection:"column",gap:"2px",padding:"8px 10px",background:"rgba(139,122,94,0.05)",borderRadius:"6px",marginBottom:"8px"},
+  complexStep:{fontSize:"12px",color:"#8b7a5e",lineHeight:"1.5"},
+  sLwide:{fontSize:"11px",color:"#8b7a5e",width:"64px",flexShrink:0,letterSpacing:"1px"},
+  slotTarget:{fontSize:"12px",color:"#6b6252",flex:1},
+  sRramp:{opacity:0.6},
+  unitLbl:{fontSize:"10px",color:"#6b6252",width:"26px",flexShrink:0},
+  supersetHead:{fontSize:"11px",color:"#b48cc8",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px",fontWeight:"600"},
+  supersetDivider:{height:"1px",background:"rgba(139,122,94,0.12)",margin:"12px 0"},
+  exMuscles:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"1px",margin:"2px 0 0 0"},
+  presetNotice:{display:"flex",gap:"12px",alignItems:"flex-start",padding:"14px",background:"rgba(180,140,200,0.06)",border:"1px solid rgba(180,140,200,0.2)",borderRadius:"10px",marginBottom:"16px"},
+  presetNoticeIcon:{fontSize:"20px",flexShrink:0},
+  presetNoticeTitle:{fontSize:"14px",color:"#e8dcc8",fontWeight:"600",marginBottom:"4px"},
+  presetNoticeText:{fontSize:"12px",color:"#8b7a5e",lineHeight:"1.5"},
 };
