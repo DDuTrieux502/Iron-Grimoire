@@ -755,34 +755,56 @@ function getQuestTarget(q, habits) {
   return q.target;
 }
 
+const localDateKey = (iso) => iso ? dateKey(new Date(iso)) : "";
+
 function computePresenceStreak({ history = [], meditations = [], habitLog = {}, readingSessions = [], runs = [] }) {
   const activeDates = new Set();
-  history.forEach(s => s?.date && activeDates.add(s.date));
-  meditations.forEach(m => m?.date && activeDates.add(m.date));
-  runs.forEach(r => r?.date && activeDates.add(r.date));
-  readingSessions.forEach(rs => rs?.date && activeDates.add(rs.date));
+  const add = (iso) => { const k = localDateKey(iso); if (k) activeDates.add(k); };
+  history.forEach(s => add(s?.date));
+  meditations.forEach(m => add(m?.date));
+  runs.forEach(r => add(r?.date));
+  readingSessions.forEach(rs => add(rs?.date));
   Object.values(habitLog).forEach(log => { if (log) Object.entries(log).forEach(([d, done]) => { if (done) activeDates.add(d); }); });
   let streak = 0;
   const d = new Date();
-  const tk = todayKey();
-  if (!activeDates.has(tk)) { d.setDate(d.getDate() - 1); }
+  if (!activeDates.has(dateKey(d))) { d.setDate(d.getDate() - 1); }
   while (activeDates.has(dateKey(d))) { streak++; d.setDate(d.getDate() - 1); }
-  if (activeDates.has(tk)) streak++;
   return streak;
 }
 
 function countActiveStreaks({ history = [], meditations = [], habits = [], habitLog = {}, readingSessions = [], runs = [] }) {
   const tk = todayKey();
   const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return dateKey(d); })();
-  const fresh = (dateStr) => dateStr === tk || dateStr === yesterday;
+  const fresh = (iso) => { const k = localDateKey(iso); return k === tk || k === yesterday; };
   let count = 0;
-  if (history[0]?.date && fresh(history[0].date)) count++;
-  if (meditations[0]?.date && fresh(meditations[0].date)) count++;
-  if (runs[0]?.date && fresh(runs[0].date)) count++;
-  if (readingSessions[0]?.date && fresh(readingSessions[0].date)) count++;
+  if (fresh(history[0]?.date)) count++;
+  if (fresh(meditations[0]?.date)) count++;
+  if (fresh(runs[0]?.date)) count++;
+  if (fresh(readingSessions[0]?.date)) count++;
   const habitFresh = habits.some(h => { const log = habitLog[h.id] || {}; return log[tk] || log[yesterday]; });
   if (habitFresh) count++;
   return count;
+}
+
+function activePillarsToday({ history = [], meditations = [], habits = [], habitLog = {}, readingSessions = [], runs = [] }) {
+  const tk = todayKey();
+  const isToday = (iso) => localDateKey(iso) === tk;
+  const set = new Set();
+  if (history.some(s => isToday(s?.date))) set.add("iron");
+  if (habits.some(h => habitLog[h.id]?.[tk])) set.add("disc");
+  if (meditations.some(m => isToday(m?.date))) set.add("mind");
+  if (runs.some(r => isToday(r?.date))) set.add("stride");
+  if (readingSessions.some(rs => isToday(rs?.date))) set.add("lore");
+  return set;
+}
+
+const SYNERGY_MULT = 1.1;
+function applySynergy(baseXP, currentPillar, ctx) {
+  const pillars = activePillarsToday(ctx);
+  const otherActive = [...pillars].some(p => p !== currentPillar);
+  if (!otherActive) return { xp: baseXP, bonus: 0, synergy: false };
+  const total = Math.round(baseXP * SYNERGY_MULT);
+  return { xp: total, bonus: total - baseXP, synergy: true };
 }
 
 function computeNextAction({ history = [], meditations = [], habits = [], habitLog = {}, readingSessions = [], runs = [] }) {
@@ -1203,6 +1225,7 @@ export default function App() {
   const [restSeconds, setRestSeconds] = useState(0);
   const [earnedXP, setEarnedXP] = useState(0);
   const [earnedPillar, setEarnedPillar] = useState("iron");
+  const [earnedSynergyBonus, setEarnedSynergyBonus] = useState(0);
   const [ironLeveledUp, setIronLeveledUp] = useState(false);
   const [activeExercise, setActiveExercise] = useState(null);
   const [activeBookId, setActiveBookId] = useState(null);
@@ -1426,13 +1449,15 @@ export default function App() {
         if (s?.done) { const w = parseFloat(s.weight) || 0; if (w > (nPrs[ex.id] || 0)) nPrs[ex.id] = w; }
       }
     });
-    const sxp = calcIronXP(session);
+    const baseXP = calcIronXP(session);
+    const syn = applySynergy(baseXP, "iron", { history, meditations, habits, habitLog, readingSessions, runs });
+    const sxp = syn.xp;
     const prevRank = getRank(ironXP, IRON_RANKS);
     const nxp = ironXP + sxp;
     const nl = getRank(nxp, IRON_RANKS);
 
     setHistory(nh); setLastWeights(nw); setPrs(nPrs); setIronXP(nxp);
-    setEarnedXP(sxp); setEarnedPillar("iron");
+    setEarnedXP(sxp); setEarnedPillar("iron"); setEarnedSynergyBonus(syn.bonus);
     setIronLeveledUp(nl.current.level > prevRank.current.level);
     await Promise.all([save(user,"history",nh), save(user,"lastWeights",nw), save(user,"prs",nPrs), save(user,"ironXP",nxp)]);
     const { newIronXP, newDiscXP, newMindXP, newQC } = await checkAndAwardQuests(nh, habitLog, meditations);
@@ -1449,7 +1474,12 @@ export default function App() {
     if (wasDone) delete newLog[habitId][tk];
     setHabitLog(newLog);
     let newXP = discXP;
-    if (!wasDone) { newXP += 5; } else { newXP = Math.max(0, newXP - 5); }
+    if (!wasDone) {
+      const syn = applySynergy(5, "disc", { history, meditations, habits, habitLog, readingSessions, runs });
+      newXP += syn.xp;
+    } else {
+      newXP = Math.max(0, newXP - 5);
+    }
     setDiscXP(newXP);
     await Promise.all([save(user,"habitLog",newLog), save(user,"discXP",newXP)]);
     const { newIronXP, newDiscXP, newMindXP, newQC } = await checkAndAwardQuests(history, newLog, meditations);
@@ -1476,9 +1506,11 @@ export default function App() {
   const finishJournal = async () => {
     const entry = { date: new Date().toISOString(), duration: medCompleted, journal: medJournal.trim(), type: medSelectedType };
     const nm = [entry, ...meditations];
-    const xpGain = medCompleted + (medCompleted >= 20 ? 10 : 0);
+    const baseXP = medCompleted + (medCompleted >= 20 ? 10 : 0);
+    const syn = applySynergy(baseXP, "mind", { history, meditations, habits, habitLog, readingSessions, runs });
+    const xpGain = syn.xp;
     const nxp = mindXP + xpGain;
-    setMeditations(nm); setMindXP(nxp); setMedJournal(""); setEarnedXP(xpGain); setEarnedPillar("mind");
+    setMeditations(nm); setMindXP(nxp); setMedJournal(""); setEarnedXP(xpGain); setEarnedPillar("mind"); setEarnedSynergyBonus(syn.bonus);
     await Promise.all([save(user,"meditations",nm), save(user,"mindXP",nxp)]);
     const { newIronXP, newDiscXP, newMindXP, newQC } = await checkAndAwardQuests(history, habitLog, nm);
     const stats = computeAllStats({ history, habits, habitLog, meditations: nm, prs, ironXP: newIronXP, discXP: newDiscXP, mindXP: newMindXP, questsCompleted: newQC, ascensions, customHabitsCreated, bodyLog, books, readingSessions });
@@ -1494,9 +1526,11 @@ export default function App() {
     const distXP = Math.round((parseFloat(runData.distance) || 0) * 20);
     const timeXP = Math.round(((parseInt(runData.duration) || 0) / 60) * 2);
     const effortXP = (parseInt(runData.effort) || 0) * 5;
-    const xpGain = distXP + timeXP + effortXP + 10; // +10 base
+    const baseXP = distXP + timeXP + effortXP + 10; // +10 base
+    const syn = applySynergy(baseXP, "stride", { history, meditations, habits, habitLog, readingSessions, runs });
+    const xpGain = syn.xp;
     const nxp = strideXP + xpGain;
-    setRuns(nr); setStrideXP(nxp); setEarnedXP(xpGain); setEarnedPillar("stride");
+    setRuns(nr); setStrideXP(nxp); setEarnedXP(xpGain); setEarnedPillar("stride"); setEarnedSynergyBonus(syn.bonus);
     // If part of active program, advance it
     let programJustCompleted = false;
     let newActiveProgram = activeProgram;
@@ -1586,10 +1620,12 @@ export default function App() {
     // Update currentPage on the book
     const nb = books.map(b => b.id === bookId ? { ...b, currentPage: (b.currentPage || 0) + p } : b);
     // XP: 10 per page + 1 per minute + 10 base
-    const xpGain = 10 + (p * 10) + m;
+    const baseXP = 10 + (p * 10) + m;
+    const syn = applySynergy(baseXP, "lore", { history, meditations, habits, habitLog, readingSessions, runs });
+    const xpGain = syn.xp;
     const nxp = loreXP + xpGain;
     setReadingSessions(ns); setBooks(nb); setLoreXP(nxp);
-    setEarnedXP(xpGain); setEarnedPillar("lore");
+    setEarnedXP(xpGain); setEarnedPillar("lore"); setEarnedSynergyBonus(syn.bonus);
     await Promise.all([save(user,"readingSessions",ns), save(user,"books",nb), save(user,"loreXP",nxp)]);
     const stats = computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated, bodyLog, runs, activeProgram, books: nb, readingSessions: ns });
     await checkAchievements(stats);
@@ -1601,10 +1637,12 @@ export default function App() {
     const finishedBook = nb.find(b => b.id === bookId);
     const pageBonus = (finishedBook?.pages || 0) * 5;
     const baseBonus = 200;
-    const xpGain = baseBonus + pageBonus;
+    const baseXP = baseBonus + pageBonus;
+    const syn = applySynergy(baseXP, "lore", { history, meditations, habits, habitLog, readingSessions, runs });
+    const xpGain = syn.xp;
     const nxp = loreXP + xpGain;
     setBooks(nb); setLoreXP(nxp);
-    setEarnedXP(xpGain); setEarnedPillar("lore");
+    setEarnedXP(xpGain); setEarnedPillar("lore"); setEarnedSynergyBonus(syn.bonus);
     await Promise.all([save(user,"books",nb), save(user,"loreXP",nxp)]);
     const stats = computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, discXP, mindXP, questsCompleted, ascensions, customHabitsCreated, bodyLog, runs, activeProgram, books: nb, readingSessions });
     await checkAchievements(stats);
@@ -1618,9 +1656,11 @@ export default function App() {
     const entry = { date: new Date().toISOString(), measurements: {} };
     valid.forEach(k => { entry.measurements[k] = parseFloat(measurements[k]); });
     const nbl = [entry, ...bodyLog];
-    const xpGain = 10 + valid.length * 2;
+    const baseXP = 10 + valid.length * 2;
+    const syn = applySynergy(baseXP, "disc", { history, meditations, habits, habitLog, readingSessions, runs });
+    const xpGain = syn.xp;
     const nxp = discXP + xpGain;
-    setBodyLog(nbl); setDiscXP(nxp); setEarnedXP(xpGain); setEarnedPillar("disc");
+    setBodyLog(nbl); setDiscXP(nxp); setEarnedXP(xpGain); setEarnedPillar("disc"); setEarnedSynergyBonus(syn.bonus);
     await Promise.all([save(user,"bodyLog",nbl), save(user,"discXP",nxp)]);
     const stats = computeAllStats({ history, habits, habitLog, meditations, prs, ironXP, discXP: nxp, mindXP, questsCompleted, ascensions, customHabitsCreated, bodyLog: nbl, runs, activeProgram });
     await checkAchievements(stats);
@@ -1688,6 +1728,8 @@ export default function App() {
     const presenceStreak = computePresenceStreak({ history, meditations, habitLog, readingSessions, runs });
     const activeStreakCount = countActiveStreaks({ history, meditations, habits, habitLog, readingSessions, runs });
     const nextAction = computeNextAction({ history, meditations, habits, habitLog, readingSessions, runs });
+    const pillarsToday = activePillarsToday({ history, meditations, habits, habitLog, readingSessions, runs });
+    const synergyActive = pillarsToday.size >= 2;
     const completedToday = activeDailyQuests.filter(q => q.completed).length;
     const totalToday = activeDailyQuests.length + (activeWeeklyQuest ? 1 : 0);
     return (
@@ -1698,6 +1740,14 @@ export default function App() {
           <span style={S.streakDay}>✦ {presenceStreak > 0 ? `Day ${presenceStreak}` : "Begin the Path"}</span>
           <span style={S.streakAlive}>{activeStreakCount} {activeStreakCount === 1 ? "streak" : "streaks"} alive</span>
         </div>
+
+        {synergyActive && (
+          <div style={S.synergyBanner}>
+            <span style={S.synergyBannerIcon}>✺</span>
+            <span style={S.synergyBannerText}>Synergy +10% Active</span>
+            <span style={S.synergyBannerMeta}>{pillarsToday.size} pillars today</span>
+          </div>
+        )}
 
         <div style={S.hubGreeting}>
           <span style={S.hubGreetingName}>{user}</span>
@@ -1842,7 +1892,7 @@ export default function App() {
   if (view === "body-log") return <BodyLogView trackedMetrics={trackedMetrics} latestEntry={bodyLog[0]} onSave={saveBodyEntry} onBack={()=>setView("body-almanac")}/>;
   if (view === "body-settings") return <BodySettingsView trackedMetrics={trackedMetrics} logFrequency={logFrequency} onSave={async (tm, lf)=>{setTrackedMetrics(tm);setLogFrequency(lf);await save(user,"trackedMetrics",tm);await save(user,"logFrequency",lf);setView("body-almanac");}} onBack={()=>setView("body-almanac")}/>;
   if (view === "body-summary") return (
-    <SummaryView icon="⚖" pillar="disc" pillarColor="#a0c49c" title="Measurements Logged" date={new Date()} earnedXP={earnedXP} xpLabel="Discipline XP Earned" xpBreakdown={[`Base: +10`, `Per metric: +${earnedXP-10}`]} onReturn={()=>setView("body-almanac")}/>
+    <SummaryView icon="⚖" pillar="disc" pillarColor="#a0c49c" title="Measurements Logged" date={new Date()} earnedXP={earnedXP} xpLabel="Discipline XP Earned" xpBreakdown={[`Base: +10`, `Per metric: +${earnedXP-10-earnedSynergyBonus}`, ...(earnedSynergyBonus>0?[`✺ Synergy: +${earnedSynergyBonus}`]:[])]} onReturn={()=>setView("body-almanac")}/>
   );
 
   // ═════════════════════════════════════════════════════
@@ -1896,7 +1946,7 @@ export default function App() {
       icon="◆" pillar="iron" pillarColor="#c4a96a"
       title="Session Recorded" date={new Date()}
       leveledUp={ironLeveledUp} newRank={iron}
-      earnedXP={earnedXP} xpLabel="Iron XP Earned" xpBreakdown={[`${cs} sets × 10`, `Volume bonus: +${Math.floor(vol/100)}`, ...(cs===ts?[`Perfect session: +50`]:[])]}
+      earnedXP={earnedXP} xpLabel="Iron XP Earned" xpBreakdown={[`${cs} sets × 10`, `Volume bonus: +${Math.floor(vol/100)}`, ...(cs===ts?[`Perfect session: +50`]:[]), ...(earnedSynergyBonus>0?[`✺ Synergy: +${earnedSynergyBonus}`]:[])]}
       stats={[[`${w.sigil} Workout`, w.name],["Sets",`${cs}/${ts}`],["Volume",`${vol.toLocaleString()} lbs`]]}
       completedQuests={completedQuestsThisAction} newAchievements={newAchievements}
       onReturn={()=>setView("iron-home")}
@@ -2012,7 +2062,7 @@ export default function App() {
     <SummaryView
       icon="☽" pillar="mind" pillarColor="#9cb4c4"
       title="Session Complete" date={new Date()}
-      earnedXP={earnedXP} xpLabel="Mind XP Earned" xpBreakdown={[`${medCompleted} min × 1`, ...(medCompleted>=20?[`Long session: +10`]:[])]}
+      earnedXP={earnedXP} xpLabel="Mind XP Earned" xpBreakdown={[`${medCompleted} min × 1`, ...(medCompleted>=20?[`Long session: +10`]:[]), ...(earnedSynergyBonus>0?[`✺ Synergy: +${earnedSynergyBonus}`]:[])]}
       completedQuests={completedQuestsThisAction} newAchievements={newAchievements}
       onReturn={()=>setView("mind-home")}
     />
@@ -2042,7 +2092,7 @@ export default function App() {
   if (view.startsWith("stride-log-program:")) { const idx = parseInt(view.split(":")[1]); return <StrideLogView programWorkoutIdx={idx} activeProgram={activeProgram} onSave={saveRun} onBack={()=>setView("stride-program-view")}/>; }
 
   if (view === "stride-summary") return (
-    <SummaryView icon="🏃" pillar="stride" pillarColor="#dcb496" title="Run Recorded" date={new Date()} earnedXP={earnedXP} xpLabel="Stride XP Earned" xpBreakdown={["Base: +10", "Distance + Duration + Effort bonus"]} onReturn={()=>setView("stride-home")}/>
+    <SummaryView icon="🏃" pillar="stride" pillarColor="#dcb496" title="Run Recorded" date={new Date()} earnedXP={earnedXP} xpLabel="Stride XP Earned" xpBreakdown={["Base: +10", "Distance + Duration + Effort bonus", ...(earnedSynergyBonus>0?[`✺ Synergy: +${earnedSynergyBonus}`]:[])]} onReturn={()=>setView("stride-home")}/>
   );
 
   if (view === "stride-history") return (
@@ -2073,7 +2123,7 @@ export default function App() {
   if (view === "lore-finish-book" && activeBookId) { const book = books.find(b => b.id === activeBookId); if (!book) { setView("lore-home"); return null; } return <LoreFinishBookView book={book} onSave={(rating, notes, quotes)=>finishBook(book.id, rating, notes, quotes)} onBack={()=>setView("lore-book-detail")}/>; }
 
   if (view === "lore-summary") return (
-    <SummaryView icon="📖" pillar="lore" pillarColor="#b48cc8" title="Wisdom Gained" date={new Date()} earnedXP={earnedXP} xpLabel="Lore XP Earned" xpBreakdown={["Reading session logged"]} onReturn={()=>setView("lore-home")}/>
+    <SummaryView icon="📖" pillar="lore" pillarColor="#b48cc8" title="Wisdom Gained" date={new Date()} earnedXP={earnedXP} xpLabel="Lore XP Earned" xpBreakdown={["Reading session logged", ...(earnedSynergyBonus>0?[`✺ Synergy: +${earnedSynergyBonus}`]:[])]} onReturn={()=>setView("lore-home")}/>
   );
 
   if (view === "lore-ranks") return <RanksView ranks={LORE_RANKS} currentLvl={lore.current.level} currentXP={loreXP} title="📖 Ranks of Lore" onBack={()=>setView("lore-home")}/>;
@@ -4222,6 +4272,10 @@ const S = {
   starBtn:{background:"none",border:"none",fontSize:"42px",cursor:"pointer",padding:"4px 6px",fontFamily:"inherit",transition:"transform 0.15s"},
   hubWrap:{padding:"16px 16px 96px 16px"},
   streakStripe:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"linear-gradient(135deg,rgba(196,169,106,0.08),rgba(139,122,94,0.04))",border:"1px solid rgba(196,169,106,0.2)",borderRadius:"10px",marginBottom:"14px"},
+  synergyBanner:{display:"flex",alignItems:"center",gap:"10px",padding:"8px 14px",background:"linear-gradient(135deg,rgba(180,140,200,0.12),rgba(220,180,240,0.06))",border:"1px solid rgba(220,180,240,0.3)",borderRadius:"10px",marginBottom:"14px"},
+  synergyBannerIcon:{fontSize:"16px",color:"#d4b4e4"},
+  synergyBannerText:{flex:1,fontSize:"12px",color:"#d4b4e4",letterSpacing:"2px",textTransform:"uppercase",fontWeight:"600"},
+  synergyBannerMeta:{fontSize:"10px",color:"#8b7a8e",letterSpacing:"2px",textTransform:"uppercase"},
   streakDay:{fontSize:"14px",color:"#c4a96a",letterSpacing:"2px",fontWeight:"600"},
   streakAlive:{fontSize:"11px",color:"#8b7a5e",letterSpacing:"2px",textTransform:"uppercase"},
   hubGreeting:{display:"flex",alignItems:"baseline",justifyContent:"center",gap:"10px",marginBottom:"18px"},
