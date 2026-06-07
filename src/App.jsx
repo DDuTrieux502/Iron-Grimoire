@@ -807,6 +807,91 @@ function applySynergy(baseXP, currentPillar, ctx) {
   return { xp: total, bonus: total - baseXP, synergy: true };
 }
 
+const STALL_THRESHOLDS = {
+  aggressive: { label: "Aggressive", weeks: 2, minSessions: 2, desc: "2 wks, 2+ sessions" },
+  standard:   { label: "Standard",   weeks: 4, minSessions: 3, desc: "4 wks, 3+ sessions" },
+  patient:    { label: "Patient",    weeks: 6, minSessions: 4, desc: "6 wks, 4+ sessions" },
+};
+
+function findExerciseName(exId, workouts) {
+  for (const day of Object.values(workouts || {})) {
+    const ex = (day.exercises || []).find(e => e.id === exId);
+    if (ex) return { name: ex.name, day };
+  }
+  return { name: exId, day: null };
+}
+
+function setsForExercise(entry, exId) {
+  return Object.entries(entry.sets || {}).filter(([k, s]) => k.startsWith(exId + "-s") && s?.done);
+}
+
+function computePRsByExercise({ history, prs, workouts }) {
+  const result = [];
+  for (const exId in (prs || {})) {
+    const prWeight = parseFloat(prs[exId]) || 0;
+    if (prWeight <= 0) continue;
+    let prDate = null;
+    // Walk history from oldest to newest to find earliest date that hit the PR
+    for (let i = history.length - 1; i >= 0; i--) {
+      const entry = history[i];
+      const hit = setsForExercise(entry, exId).some(([, s]) => (parseFloat(s.weight) || 0) >= prWeight);
+      if (hit) { prDate = entry.date; break; }
+    }
+    const daysSince = prDate ? Math.floor((Date.now() - new Date(prDate).getTime()) / 86400000) : null;
+    const { name } = findExerciseName(exId, workouts);
+    result.push({ exerciseId: exId, name, weight: prWeight, prDate, daysSince });
+  }
+  return result.sort((a, b) => (a.daysSince ?? 9999) - (b.daysSince ?? 9999));
+}
+
+function computeStalledLifts({ history, prs, workouts, threshold }) {
+  const cfg = STALL_THRESHOLDS[threshold] || STALL_THRESHOLDS.standard;
+  const cutoff = Date.now() - cfg.weeks * 7 * 86400000;
+  const candidates = computePRsByExercise({ history, prs, workouts });
+  const stalled = [];
+  for (const c of candidates) {
+    if (!c.prDate) continue;
+    if (new Date(c.prDate).getTime() > cutoff) continue;
+    const sessionsInWindow = history.filter(h => {
+      const t = new Date(h.date).getTime();
+      if (t < cutoff) return false;
+      return setsForExercise(h, c.exerciseId).length > 0;
+    }).length;
+    if (sessionsInWindow < cfg.minSessions) continue;
+    stalled.push({ ...c, sessionsInWindow, weeks: cfg.weeks });
+  }
+  return stalled.sort((a, b) => (b.daysSince ?? 0) - (a.daysSince ?? 0));
+}
+
+function computeWeeklyVolume(history, weeks = 8) {
+  const buckets = [];
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  for (let i = weeks - 1; i >= 0; i--) {
+    const end = new Date(today);
+    end.setDate(end.getDate() - i * 7);
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    let volume = 0;
+    let sessions = 0;
+    history.forEach(h => {
+      const t = new Date(h.date).getTime();
+      if (t < startTime || t > endTime) return;
+      sessions++;
+      Object.values(h.sets || {}).forEach(s => {
+        if (!s?.done) return;
+        volume += (parseFloat(s.weight) || 0) * (parseFloat(s.reps) || 0);
+      });
+    });
+    const label = `${start.getMonth() + 1}/${start.getDate()}`;
+    buckets.push({ label, volume: Math.round(volume), sessions });
+  }
+  return buckets;
+}
+
 function computeNextAction({ history = [], meditations = [], habits = [], habitLog = {}, readingSessions = [], runs = [] }) {
   const tk = todayKey();
   const now = new Date();
@@ -1249,6 +1334,10 @@ export default function App() {
   // Achievements gallery state
   const [achievementFilter, setAchievementFilter] = useState("all");
 
+  // Iron history UI state
+  const [historyTab, setHistoryTab] = useState("sessions");
+  const [stallThreshold, setStallThreshold] = useState("standard");
+
   // Load profiles
   useEffect(() => { (async () => {
     const p = await load(null, "profiles", []);
@@ -1257,7 +1346,7 @@ export default function App() {
 
   // Load user data
   useEffect(() => { if (!user) return; (async () => {
-    const [h, lw, pr, ix, dx, mx, hb, hl, md, ua, dq, wq, qc, asc, chc, cw, cmt, cmdp, bl, tm, lf, rn, sx, ap, bk, rs, lxp] = await Promise.all([
+    const [h, lw, pr, ix, dx, mx, hb, hl, md, ua, dq, wq, qc, asc, chc, cw, cmt, cmdp, bl, tm, lf, rn, sx, ap, bk, rs, lxp, st] = await Promise.all([
       load(user, "history", []), load(user, "lastWeights", {}), load(user, "prs", {}),
       load(user, "ironXP", 0), load(user, "discXP", 0), load(user, "mindXP", 0),
       load(user, "habits", PRESET_HABITS.slice(0,3)), load(user, "habitLog", {}),
@@ -1277,6 +1366,7 @@ export default function App() {
       load(user, "books", []),
       load(user, "readingSessions", []),
       load(user, "loreXP", 0),
+      load(user, "stallThreshold", "standard"),
     ]);
     setHistory(h); setLastWeights(lw); setPrs(pr);
     setIronXP(ix); setDiscXP(dx); setMindXP(mx);
@@ -1287,6 +1377,7 @@ export default function App() {
     setBodyLog(bl); setTrackedMetrics(tm); setLogFrequency(lf);
     setRuns(rn); setStrideXP(sx); setActiveProgram(ap);
     setBooks(bk); setReadingSessions(rs); setLoreXP(lxp);
+    setStallThreshold(st);
     // Generate quests if needed
     refreshQuests(dq, wq);
     // Check for unseen monthly chronicle
@@ -1953,13 +2044,123 @@ export default function App() {
     />
   );}
 
-  if (view === "iron-history") return (
-    <div style={S.c}>
-      <AnimStyles/>
-      <div style={S.wH}><button style={S.bk} onClick={()=>setView("iron-home")}>‹</button><h2 style={S.wT}>◆ Iron History</h2></div>
-      <div style={S.hL}>{history.length===0&&<p style={S.emp}>No sessions yet.</p>}{history.map((e,i)=>{const w=workouts[e.day];const sets=Object.values(e.sets);const d=sets.filter(s=>s.done).length;const v=sets.reduce((s,x)=>s+(parseFloat(x.weight)||0)*(parseFloat(x.reps)||0),0);return(<div key={i} style={S.hC}><div style={S.hCT}><span style={S.hCS}>{w.sigil}</span><span style={S.hCN}>{w.name}</span><span style={S.hCD}>{fmtDate(new Date(e.date))}</span></div><div><span style={S.hCM}>{d} sets · {v.toLocaleString()} lbs</span></div></div>);})}</div>
-    </div>
-  );
+  if (view === "iron-history") {
+    const weeklyVol = computeWeeklyVolume(history, 8);
+    const maxVol = Math.max(1, ...weeklyVol.map(b => b.volume));
+    const totalRecentVol = weeklyVol.reduce((s, b) => s + b.volume, 0);
+    const recentSessions = weeklyVol.reduce((s, b) => s + b.sessions, 0);
+    const prsList = computePRsByExercise({ history, prs, workouts });
+    const stalled = computeStalledLifts({ history, prs, workouts, threshold: stallThreshold });
+    const showDeload = stalled.length >= 3;
+    return (
+      <div style={S.c}>
+        <AnimStyles/>
+        <div style={S.wH}><button style={S.bk} onClick={()=>setView("iron-home")}>‹</button><h2 style={S.wT}>◆ Iron History</h2></div>
+
+        <div style={S.subTabs}>
+          <button style={{...S.subTab, ...(historyTab === "sessions" ? S.subTabActive : {})}} onClick={()=>setHistoryTab("sessions")}>Sessions</button>
+          <button style={{...S.subTab, ...(historyTab === "records" ? S.subTabActive : {})}} onClick={()=>setHistoryTab("records")}>Records</button>
+          <button style={{...S.subTab, ...(historyTab === "stalled" ? S.subTabActive : {})}} onClick={()=>setHistoryTab("stalled")}>Stalled</button>
+        </div>
+
+        {historyTab === "sessions" && (
+          <>
+            <div style={S.volChartBox}>
+              <div style={S.volChartHead}>
+                <span style={S.volChartTitle}>Weekly Volume · 8 wks</span>
+                <span style={S.volChartMeta}>{totalRecentVol.toLocaleString()} lbs · {recentSessions} sessions</span>
+              </div>
+              <div style={S.volChartRow}>
+                {weeklyVol.map((b, i) => (
+                  <div key={i} style={S.volBarCol}>
+                    {b.volume > 0 ? <div style={{...S.volBar, height: `${(b.volume / maxVol) * 100}%`}}/> : <div style={S.volBarEmpty}/>}
+                    <span style={S.volBarLbl}>{b.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={S.hL}>
+              {history.length === 0 && <p style={S.emp}>No sessions yet.</p>}
+              {history.map((e, i) => {
+                const w = workouts[e.day];
+                if (!w) return null;
+                const sets = Object.values(e.sets || {});
+                const d = sets.filter(s => s.done).length;
+                const v = sets.reduce((s, x) => s + (parseFloat(x.weight) || 0) * (parseFloat(x.reps) || 0), 0);
+                return (
+                  <div key={i} style={S.hC}>
+                    <div style={S.hCT}>
+                      <span style={S.hCS}>{w.sigil}</span>
+                      <span style={S.hCN}>{w.name}</span>
+                      <span style={S.hCD}>{fmtDate(new Date(e.date))}</span>
+                    </div>
+                    <div><span style={S.hCM}>{d} sets · {v.toLocaleString()} lbs</span></div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {historyTab === "records" && (
+          <>
+            {prsList.length === 0 && <p style={S.emp}>No personal records yet. Lift something heavy.</p>}
+            <div style={S.hL}>
+              {prsList.map(p => (
+                <div key={p.exerciseId} style={S.prCard}>
+                  <span style={S.prCardEmb}>◆</span>
+                  <div style={S.prCardMid}>
+                    <span style={S.prCardName}>{p.name}</span>
+                    <span style={S.prCardSub}>{p.prDate ? `Set ${fmtDate(new Date(p.prDate))}${p.daysSince !== null ? ` · ${p.daysSince}d ago` : ""}` : "Date unknown"}</span>
+                  </div>
+                  <span style={S.prCardWeight}>{p.weight} lbs</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {historyTab === "stalled" && (
+          <>
+            <div style={S.thresholdRow}>
+              {Object.entries(STALL_THRESHOLDS).map(([k, v]) => (
+                <button
+                  key={k}
+                  style={{...S.thresholdBtn, ...(stallThreshold === k ? S.thresholdBtnActive : {})}}
+                  onClick={async ()=>{ setStallThreshold(k); await save(user, "stallThreshold", k); }}
+                >
+                  <span style={S.thresholdBtnLbl}>{v.label}</span>
+                  <span style={S.thresholdBtnDesc}>{v.desc}</span>
+                </button>
+              ))}
+            </div>
+            {showDeload && (
+              <div style={S.deloadBanner}>
+                <span style={S.deloadBannerIcon}>✺</span>
+                <div style={{flex:1}}>
+                  <div style={S.deloadBannerText}>Consider a deload week</div>
+                  <div style={S.deloadBannerSub}>{stalled.length} stalled lifts — strategic retreat suggested</div>
+                </div>
+              </div>
+            )}
+            {stalled.length === 0 && <p style={S.emp}>No stalled lifts. Keep pushing.</p>}
+            <div style={S.hL}>
+              {stalled.map(s => (
+                <div key={s.exerciseId} style={S.stallCard}>
+                  <span style={S.stallCardEmb}>⚠</span>
+                  <div style={S.prCardMid}>
+                    <span style={S.prCardName}>{s.name}</span>
+                    <span style={S.prCardSub}>{s.daysSince}d since PR · {s.sessionsInWindow} sessions in last {s.weeks} wks</span>
+                  </div>
+                  <span style={S.stallCardWeight}>{s.weight} lbs</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (view === "iron-ranks") return <RanksView ranks={IRON_RANKS} currentLvl={iron.current.level} currentXP={ironXP} title="⚔ Ranks of Iron" onBack={()=>setView("iron-home")}/>;
 
@@ -4318,4 +4519,34 @@ const S = {
   tabBtnActive:{color:"#c4a96a",background:"rgba(196,169,106,0.08)"},
   tabIcon:{fontSize:"18px",lineHeight:1},
   tabLabel:{fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase"},
+  subTabs:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"4px",padding:"4px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"10px",marginBottom:"16px"},
+  subTab:{padding:"10px 4px",background:"none",border:"none",color:"#6b6252",fontFamily:"inherit",fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",cursor:"pointer",borderRadius:"6px"},
+  subTabActive:{background:"rgba(196,169,106,0.12)",color:"#c4a96a"},
+  volChartBox:{padding:"14px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"10px",marginBottom:"16px"},
+  volChartHead:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"12px"},
+  volChartTitle:{fontSize:"12px",color:"#8b7a5e",letterSpacing:"3px",textTransform:"uppercase"},
+  volChartMeta:{fontSize:"11px",color:"#6b6252"},
+  volChartRow:{display:"flex",alignItems:"flex-end",gap:"6px",height:"80px"},
+  volBarCol:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:"100%"},
+  volBar:{width:"100%",minHeight:"2px",background:"linear-gradient(180deg,#c4a96a,#8b7a5e)",borderRadius:"2px 2px 0 0",transition:"height 0.4s"},
+  volBarEmpty:{width:"100%",height:"2px",background:"rgba(139,122,94,0.15)",borderRadius:"2px"},
+  volBarLbl:{fontSize:"9px",color:"#6b6252",marginTop:"4px",letterSpacing:"1px"},
+  prCard:{display:"flex",alignItems:"center",gap:"12px",padding:"12px 14px",background:"rgba(196,169,106,0.06)",border:"1px solid rgba(196,169,106,0.18)",borderRadius:"10px"},
+  prCardEmb:{fontSize:"20px",color:"#c4a96a"},
+  prCardMid:{flex:1,display:"flex",flexDirection:"column",gap:"2px"},
+  prCardName:{fontSize:"14px",color:"#e8dcc8",fontWeight:"600"},
+  prCardSub:{fontSize:"11px",color:"#8b7a5e"},
+  prCardWeight:{fontSize:"18px",color:"#c4a96a",fontWeight:"600",fontVariantNumeric:"tabular-nums"},
+  stallCard:{display:"flex",alignItems:"center",gap:"12px",padding:"12px 14px",background:"rgba(196,124,90,0.06)",border:"1px solid rgba(196,124,90,0.22)",borderRadius:"10px"},
+  stallCardEmb:{fontSize:"20px",color:"#c47a6a"},
+  stallCardWeight:{fontSize:"16px",color:"#c47a6a",fontWeight:"600",fontVariantNumeric:"tabular-nums"},
+  deloadBanner:{display:"flex",alignItems:"center",gap:"10px",padding:"12px 14px",background:"linear-gradient(135deg,rgba(180,140,200,0.12),rgba(196,124,90,0.08))",border:"1px solid rgba(220,180,240,0.3)",borderRadius:"10px",marginBottom:"14px"},
+  deloadBannerIcon:{fontSize:"20px",color:"#d4b4e4"},
+  deloadBannerText:{flex:1,fontSize:"13px",color:"#d4b4e4",letterSpacing:"1px"},
+  deloadBannerSub:{fontSize:"11px",color:"#8b7a8e",letterSpacing:"1px",marginTop:"2px"},
+  thresholdRow:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"16px"},
+  thresholdBtn:{padding:"10px 4px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.18)",borderRadius:"8px",color:"#8b7a5e",fontFamily:"inherit",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"2px"},
+  thresholdBtnActive:{background:"rgba(196,169,106,0.1)",border:"1px solid rgba(196,169,106,0.35)",color:"#c4a96a"},
+  thresholdBtnLbl:{fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",fontWeight:"600"},
+  thresholdBtnDesc:{fontSize:"10px",letterSpacing:"1px",opacity:0.8},
 };
