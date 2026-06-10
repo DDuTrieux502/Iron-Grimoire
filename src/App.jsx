@@ -1474,11 +1474,24 @@ export default function App() {
   const [historyTab, setHistoryTab] = useState("sessions");
   const [stallThreshold, setStallThreshold] = useState("standard");
 
+  // Onboarding (first-run welcome)
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [loginInitialMode, setLoginInitialMode] = useState(null);
+
   // Load profiles
   useEffect(() => { (async () => {
     const p = await load(null, "profiles", []);
-    setProfiles(p); setLoading(false);
+    const obSeen = await load(null, "onboardingSeen", false);
+    setProfiles(p);
+    setShowOnboarding(p.length === 0 && !obSeen);
+    setLoading(false);
   })(); }, []);
+
+  const finishOnboarding = async (toCreate) => {
+    setShowOnboarding(false);
+    setLoginInitialMode(toCreate ? "create" : null);
+    await save(null, "onboardingSeen", true);
+  };
 
   // Load user data
   useEffect(() => { if (!user) return; (async () => {
@@ -1994,7 +2007,8 @@ export default function App() {
   };
 
   if (loading) return <div style={S.loadScreen}><div style={S.loadText}>◆ Consulting the Iron Grimoire ◆</div></div>;
-  if (!user) return <LoginView profiles={profiles} onLogin={loginProfile} onCreate={createProfile} onDelete={deleteProfile}/>;
+  if (!user && showOnboarding) return <OnboardingView onFinish={finishOnboarding}/>;
+  if (!user) return <LoginView key={loginInitialMode || "select"} profiles={profiles} onLogin={loginProfile} onCreate={createProfile} onDelete={deleteProfile} initialMode={loginInitialMode} onReplayOnboarding={()=>{setLoginInitialMode(null);setShowOnboarding(true);}}/>;
 
   const iron = getRank(ironXP, IRON_RANKS);
   const disc = getRank(discXP, DISC_RANKS);
@@ -4108,8 +4122,97 @@ function RanksView({ ranks, currentLvl, currentXP, title, onBack }) {
   );
 }
 
-function LoginView({ profiles, onLogin, onCreate, onDelete }) {
-  const [mode, setMode] = useState("select"); // select, login, create, delete
+// First-run welcome carousel. onFinish(true) → jump straight into profile creation.
+function OnboardingView({ onFinish }) {
+  const [slide, setSlide] = useState(0);
+  const pillars = [
+    { icon: "⚔", name: "Iron", desc: "Lift. Programs, PRs, and the Sun Cycle.", color: "#c4a96a" },
+    { icon: "❂", name: "Discipline", desc: "Daily rituals, streaks, body tracking.", color: "#a0c49c" },
+    { icon: "☯", name: "Mind", desc: "Meditation, breathwork, and a journal.", color: "#9cb4c4" },
+    { icon: "🏃", name: "Stride", desc: "Run. From Couch-to-5K to marathon.", color: "#dcb496" },
+    { icon: "📖", name: "Lore", desc: "Read. Log pages, finish books, keep quotes.", color: "#b48cc8" },
+  ];
+  const rewards = [
+    { icon: "⟡", text: "Daily & weekly quests refresh automatically" },
+    { icon: "★", text: "75 feats to unlock across every pillar" },
+    { icon: "✺", text: "Touch 2+ pillars in a day for +10% synergy XP" },
+    { icon: "☀", text: "Max a pillar, then Ascend for a permanent multiplier" },
+  ];
+  const slides = [
+    (
+      <div key="s0" style={S.obSlide}>
+        <div style={S.obGlyph}>◆</div>
+        <h1 style={S.obTitle}>Iron Grimoire</h1>
+        <p style={S.obSub}>Your life, as a progression system</p>
+        <p style={S.obBody}>Every workout, ritual, meditation, run, and page you log earns XP. You start as an E-Rank Initiate. You climb — level by level — toward Monarch.</p>
+        <p style={S.obBody}>The grimoire doesn't care about perfect days. It cares that you showed up.</p>
+      </div>
+    ),
+    (
+      <div key="s1" style={S.obSlide}>
+        <div style={S.obGlyph}>✦</div>
+        <h1 style={S.obTitle}>Five Pillars</h1>
+        <p style={S.obSub}>Each levels on its own — 90 ranks deep</p>
+        <div style={S.obPillarList}>
+          {pillars.map(p => (
+            <div key={p.name} style={S.obPillarRow}>
+              <span style={S.obPillarIcon}>{p.icon}</span>
+              <div style={{flex:1}}>
+                <span style={{...S.obPillarName, color: p.color}}>{p.name}</span>
+                <span style={S.obPillarDesc}>{p.desc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    (
+      <div key="s2" style={S.obSlide}>
+        <div style={S.obGlyph}>⟡</div>
+        <h1 style={S.obTitle}>The Path Rewards You</h1>
+        <p style={S.obSub}>Quests, feats, and synergy</p>
+        <div style={S.obPillarList}>
+          {rewards.map((r,i) => (
+            <div key={i} style={S.obPillarRow}>
+              <span style={S.obPillarIcon}>{r.icon}</span>
+              <span style={{...S.obPillarDesc, fontSize:"14px", color:"#d4c9a8"}}>{r.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    (
+      <div key="s3" style={S.obSlide}>
+        <div style={{...S.obGlyph, animation:"glow 3s ease-in-out infinite", borderRadius:"50%"}}>⚔</div>
+        <h1 style={S.obTitle}>Begin the Path</h1>
+        <p style={S.obSub}>Create your hunter</p>
+        <p style={S.obBody}>Your grimoire lives on this device — password-protected, private, and fully offline. No account. No tracking. Just you and the work.</p>
+        <button style={S.obCTA} onClick={()=>onFinish(true)}>⚔ Create Your Hunter</button>
+        <button style={S.obSkipLink} onClick={()=>onFinish(false)}>Browse first ›</button>
+      </div>
+    ),
+  ];
+  const last = slide === slides.length - 1;
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.obTopBar}>
+        {slide > 0 ? <button style={S.obBack} onClick={()=>setSlide(slide-1)}>‹</button> : <span style={{width:"34px"}}/>}
+        {!last && <button style={S.obSkipLink} onClick={()=>onFinish(false)}>Skip ›</button>}
+      </div>
+      {slides[slide]}
+      <div style={S.obDots}>
+        {slides.map((_,i) => (
+          <button key={i} style={{...S.obDot, ...(i === slide ? S.obDotActive : {})}} onClick={()=>setSlide(i)} aria-label={`Slide ${i+1}`}/>
+        ))}
+      </div>
+      {!last && <button style={S.obNext} onClick={()=>setSlide(slide+1)}>Continue ›</button>}
+    </div>
+  );
+}
+
+function LoginView({ profiles, onLogin, onCreate, onDelete, initialMode, onReplayOnboarding }) {
+  const [mode, setMode] = useState(initialMode || "select"); // select, login, create, delete
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [newName, setNewName] = useState("");
   const [password, setPassword] = useState("");
@@ -4156,6 +4259,7 @@ function LoginView({ profiles, onLogin, onCreate, onDelete }) {
           {profiles.length===0&&<p style={S.emp}>No profiles yet. Create one below.</p>}
         </div>
         <button style={S.addHabitBtn} onClick={()=>{setMode("create");setError("");setNewName("");setPassword("");}}>+ New Profile</button>
+        {onReplayOnboarding && <button style={S.obReplayLink} onClick={onReplayOnboarding}>✦ About the Path</button>}
       </>}
 
       {mode === "login" && <>
@@ -4229,6 +4333,7 @@ function AnimStyles() {
     @keyframes pallof { 0%,100%{transform:scaleX(1)} 50%{transform:scaleX(0.7)} }
     @keyframes breathe { 0%,100%{transform:scale(1);opacity:0.4} 50%{transform:scale(1.3);opacity:0.7} }
     @keyframes glow { 0%,100%{box-shadow:0 0 20px rgba(220,180,240,0.3)} 50%{box-shadow:0 0 40px rgba(220,180,240,0.5)} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
     .weight-push { animation: weightpush 2.5s ease-in-out infinite; }
     .arm-overhead { animation: armoh 2.5s ease-in-out infinite; }
     .arm-pulldown { animation: pulldown 2s ease-in-out infinite; }
@@ -4875,4 +4980,23 @@ const S = {
   presetNoticeIcon:{fontSize:"20px",flexShrink:0},
   presetNoticeTitle:{fontSize:"14px",color:"#e8dcc8",fontWeight:"600",marginBottom:"4px"},
   presetNoticeText:{fontSize:"12px",color:"#8b7a5e",lineHeight:"1.5"},
+  obTopBar:{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:"8px",minHeight:"42px"},
+  obBack:{background:"none",border:"1px solid rgba(139,122,94,0.2)",color:"#8b7a5e",fontSize:"18px",width:"34px",height:"34px",borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"},
+  obSkipLink:{background:"none",border:"none",color:"#6b6252",fontFamily:"inherit",fontSize:"13px",letterSpacing:"2px",cursor:"pointer",padding:"8px"},
+  obSlide:{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",padding:"24px 8px 16px 8px",minHeight:"380px",animation:"fadeUp 0.45s ease-out"},
+  obGlyph:{fontSize:"56px",color:"#c4a96a",width:"110px",height:"110px",display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(196,169,106,0.25)",borderRadius:"50%",marginBottom:"20px"},
+  obTitle:{fontSize:"26px",fontWeight:"400",letterSpacing:"4px",color:"#e8dcc8",margin:"0 0 6px 0",textTransform:"uppercase"},
+  obSub:{fontSize:"12px",color:"#8b7a5e",letterSpacing:"3px",textTransform:"uppercase",margin:"0 0 18px 0"},
+  obBody:{fontSize:"15px",color:"#d4c9a8",lineHeight:"1.7",margin:"0 0 14px 0",maxWidth:"340px"},
+  obPillarList:{display:"flex",flexDirection:"column",gap:"10px",width:"100%",textAlign:"left",marginTop:"4px"},
+  obPillarRow:{display:"flex",alignItems:"center",gap:"14px",padding:"10px 14px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.12)",borderRadius:"10px"},
+  obPillarIcon:{fontSize:"22px",width:"28px",textAlign:"center",flexShrink:0},
+  obPillarName:{fontSize:"15px",fontWeight:"600",letterSpacing:"2px",textTransform:"uppercase",display:"block"},
+  obPillarDesc:{fontSize:"12px",color:"#8b7a5e",display:"block",marginTop:"2px",lineHeight:"1.5"},
+  obDots:{display:"flex",justifyContent:"center",gap:"10px",margin:"18px 0"},
+  obDot:{width:"9px",height:"9px",borderRadius:"50%",background:"rgba(139,122,94,0.25)",border:"none",cursor:"pointer",padding:0},
+  obDotActive:{background:"#c4a96a",transform:"scale(1.25)"},
+  obNext:{width:"100%",padding:"15px",background:"linear-gradient(135deg,rgba(139,122,94,0.15),rgba(196,169,106,0.15))",border:"1px solid rgba(196,169,106,0.3)",borderRadius:"10px",color:"#c4a96a",fontFamily:"inherit",fontSize:"15px",letterSpacing:"3px",cursor:"pointer",textTransform:"uppercase"},
+  obCTA:{width:"100%",maxWidth:"340px",padding:"16px",background:"linear-gradient(135deg,rgba(196,169,106,0.2),rgba(232,203,140,0.1))",border:"1px solid rgba(232,203,140,0.4)",borderRadius:"10px",color:"#e8cb8c",fontFamily:"inherit",fontSize:"16px",letterSpacing:"3px",cursor:"pointer",textTransform:"uppercase",marginTop:"10px"},
+  obReplayLink:{width:"100%",padding:"10px",background:"none",border:"none",color:"#4a4236",fontFamily:"inherit",fontSize:"12px",letterSpacing:"2px",cursor:"pointer",marginTop:"14px"},
 };
