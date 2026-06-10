@@ -2096,7 +2096,10 @@ export default function App() {
         </div>
 
         <div style={S.hunterStatus}>
-          <div style={S.hunterStatusHead}>Hunter Status</div>
+          <div style={S.hunterStatusHeadRow}>
+            <div style={S.hunterStatusHead}>Hunter Status</div>
+            <button style={S.hunterCardBtn} onClick={()=>setView("hunter-card")}>✦ Card</button>
+          </div>
           <div style={S.hunterStatusList}>
             <CompactPillarRow rank={iron} xp={ironXP} pillar="iron" name="Iron" onClick={()=>setView("iron-home")}/>
             <CompactPillarRow rank={disc} xp={discXP} pillar="disc" name="Discipline" onClick={()=>setView("disc-home")}/>
@@ -2187,7 +2190,25 @@ export default function App() {
   // ═════════════════════════════════════════════════════
   // CHRONICLE (ANALYTICS + BODY ALMANAC)
   // ═════════════════════════════════════════════════════
-  if (view === "chronicle") return <ChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} onBack={()=>setView("home")} onBodyAlmanac={()=>setView("body-almanac")} onInsights={()=>setView("insights")} onMonthlyChronicle={()=>setView("monthly-chronicle")} onTabNav={(v)=>setView(v)}/>;
+  if (view === "chronicle") return <ChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} onBack={()=>setView("home")} onBodyAlmanac={()=>setView("body-almanac")} onInsights={()=>setView("insights")} onMonthlyChronicle={()=>setView("monthly-chronicle")} onTabNav={(v)=>setView(v)} onHunterCard={()=>setView("hunter-card")}/>;
+
+  if (view === "hunter-card") {
+    const cardPillars = [
+      { emblem: iron.current.emblem, name: "Iron", color: "#c4a96a", tier: iron.current.tier, level: iron.current.level, tierName: iron.current.tierName, progress: iron.progress, xp: ironXP },
+      { emblem: disc.current.emblem, name: "Discipline", color: "#a0c49c", tier: disc.current.tier, level: disc.current.level, tierName: disc.current.tierName, progress: disc.progress, xp: discXP },
+      { emblem: mind.current.emblem, name: "Mind", color: "#9cb4c4", tier: mind.current.tier, level: mind.current.level, tierName: mind.current.tierName, progress: mind.progress, xp: mindXP },
+      { emblem: stride.current.emblem, name: "Stride", color: "#dcb496", tier: stride.current.tier, level: stride.current.level, tierName: stride.current.tierName, progress: stride.progress, xp: strideXP },
+      { emblem: lore.current.emblem, name: "Lore", color: "#b48cc8", tier: lore.current.tier, level: lore.current.level, tierName: lore.current.tierName, progress: lore.progress, xp: loreXP },
+    ];
+    const cardStreak = computePresenceStreak({ history, meditations, habitLog, readingSessions, runs });
+    const totalXP = ironXP + discXP + mindXP + strideXP + loreXP;
+    const cardStats = [
+      { val: totalXP.toLocaleString(), label: "Total XP" },
+      { val: history.length, label: "Workouts" },
+      { val: unlockedAchievements.length, label: "Feats" },
+    ];
+    return <HunterCardView user={user} pillars={cardPillars} streak={cardStreak} ascensions={ascensions} stats={cardStats} onBack={()=>setView("chronicle")}/>;
+  }
   if (view === "monthly-chronicle") return <MonthlyChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} unlockedAchievements={unlockedAchievements} user={user} onBack={()=>setView("chronicle")}/>;
   if (view === "insights") return <InsightsView history={history} meditations={meditations} habits={habits} habitLog={habitLog} ironXP={ironXP} discXP={discXP} mindXP={mindXP} onBack={()=>setView("chronicle")}/>;
   if (view === "body-almanac") return <BodyAlmanacView bodyLog={bodyLog} trackedMetrics={trackedMetrics} logFrequency={logFrequency} onBack={()=>setView("chronicle")} onLogNew={()=>setView("body-log")} onSettings={()=>setView("body-settings")}/>;
@@ -2987,7 +3008,141 @@ function MindSettings({ medTypes, medDurationPresets, onSave, onBack }) {
   );
 }
 
-function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, ironXP, discXP, mindXP, strideXP, onBack, onBodyAlmanac, onInsights, onMonthlyChronicle, onTabNav }) {
+// ─── Hunter Card: canvas-rendered shareable status image (no backend; user posts the PNG) ───
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawHunterCard(canvas, d) {
+  const W = 1080, H = 1350;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const serif = '"Crimson Text", "Palatino Linotype", serif';
+  try { ctx.letterSpacing = "4px"; } catch {}
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#0a0a0f"); bg.addColorStop(0.5, "#12121c"); bg.addColorStop(1, "#0a0a0f");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = "rgba(196,169,106,0.35)"; ctx.lineWidth = 3;
+  ctx.strokeRect(36, 36, W - 72, H - 72);
+  ctx.strokeStyle = "rgba(196,169,106,0.12)"; ctx.lineWidth = 1;
+  ctx.strokeRect(48, 48, W - 96, H - 96);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#8b7a5e"; ctx.font = `28px ${serif}`;
+  ctx.fillText("◆   I R O N   G R I M O I R E   ◆", W / 2, 122);
+  ctx.fillStyle = "#e8dcc8"; ctx.font = `600 84px ${serif}`;
+  ctx.fillText(d.name.toUpperCase(), W / 2, 232);
+  ctx.fillStyle = "#c4a96a"; ctx.font = `34px ${serif}`;
+  const sub = (d.streak > 0 ? `Day ${d.streak} of the Path` : "The Path Begins") + (d.ascensions > 0 ? `   ·   ✺ Ascended ×${d.ascensions}` : "");
+  ctx.fillText(sub, W / 2, 294);
+  ctx.fillStyle = "#3d3528"; ctx.font = `30px ${serif}`;
+  ctx.fillText("━━━   ◈   ━━━", W / 2, 352);
+
+  const rowX = 90, rowW = W - 180, rowH = 124, gap = 22;
+  let y = 396;
+  d.pillars.forEach(p => {
+    ctx.fillStyle = "rgba(139,122,94,0.07)";
+    rrect(ctx, rowX, y, rowW, rowH, 18); ctx.fill();
+    ctx.strokeStyle = p.color + "44"; ctx.lineWidth = 2;
+    rrect(ctx, rowX, y, rowW, rowH, 18); ctx.stroke();
+
+    ctx.textAlign = "center"; ctx.fillStyle = p.color; ctx.font = `54px ${serif}`;
+    ctx.fillText(p.emblem, rowX + 70, y + 76);
+    ctx.textAlign = "left"; ctx.fillStyle = "#e8dcc8"; ctx.font = `600 40px ${serif}`;
+    ctx.fillText(p.name.toUpperCase(), rowX + 132, y + 54);
+    ctx.textAlign = "right"; ctx.fillStyle = p.color; ctx.font = `600 36px ${serif}`;
+    ctx.fillText(`${p.tier}-Rank · Lvl ${p.level}`, rowX + rowW - 40, y + 54);
+    ctx.textAlign = "left"; ctx.fillStyle = "#8b7a5e"; ctx.font = `27px ${serif}`;
+    ctx.fillText(p.tierName, rowX + 132, y + 92);
+    ctx.textAlign = "right"; ctx.fillStyle = "#6b6252"; ctx.font = `25px ${serif}`;
+    ctx.fillText(`${p.xp.toLocaleString()} XP`, rowX + rowW - 40, y + 92);
+
+    const bx = rowX + 132, bw = rowW - 172, by = y + 102, bh = 8;
+    ctx.fillStyle = "rgba(139,122,94,0.15)";
+    rrect(ctx, bx, by, bw, bh, 4); ctx.fill();
+    ctx.fillStyle = p.color;
+    rrect(ctx, bx, by, Math.max(8, bw * p.progress), bh, 4); ctx.fill();
+    y += rowH + gap;
+  });
+
+  const boxW = (rowW - 2 * gap) / 3;
+  let sx = rowX; const sy = y + 14, sh = 104;
+  d.stats.forEach(s => {
+    ctx.fillStyle = "rgba(139,122,94,0.07)";
+    rrect(ctx, sx, sy, boxW, sh, 16); ctx.fill();
+    ctx.strokeStyle = "rgba(196,169,106,0.2)"; ctx.lineWidth = 2;
+    rrect(ctx, sx, sy, boxW, sh, 16); ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#e8dcc8"; ctx.font = `600 44px ${serif}`;
+    ctx.fillText(String(s.val), sx + boxW / 2, sy + 54);
+    ctx.fillStyle = "#6b6252"; ctx.font = `23px ${serif}`;
+    ctx.fillText(s.label.toUpperCase(), sx + boxW / 2, sy + 88);
+    sx += boxW + gap;
+  });
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#6b6252"; ctx.font = `26px ${serif}`;
+  ctx.fillText("Forge your path   ·   Iron Grimoire", W / 2, H - 62);
+}
+
+function HunterCardView({ user, pillars, streak, ascensions, stats, onBack }) {
+  const [dataUrl, setDataUrl] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try { await document.fonts.ready; } catch {}
+      if (cancelled) return;
+      const canvas = document.createElement("canvas");
+      drawHunterCard(canvas, { name: user, streak, ascensions, pillars, stats });
+      setDataUrl(canvas.toDataURL("image/png"));
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const saveCard = () => {
+    if (!dataUrl) return;
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `iron-grimoire-${user.toLowerCase().replace(/\s+/g, "-")}-card.png`;
+    a.click();
+  };
+  const shareCard = async () => {
+    if (!dataUrl) return;
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "hunter-card.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Iron Grimoire — Hunter Card" });
+        return;
+      }
+    } catch {}
+    saveCard();
+  };
+
+  return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={onBack}>‹</button><h2 style={S.wT}>✦ Hunter Card</h2></div>
+      <p style={S.chronicleSubtitle}>Your status, forged into an image</p>
+      {dataUrl
+        ? <img src={dataUrl} alt="Hunter Card" style={S.hunterCardImg}/>
+        : <div style={S.hunterCardLoading}>◆ Forging the card ◆</div>}
+      <button style={S.finB} onClick={shareCard} disabled={!dataUrl}>⇪ Share Card</button>
+      <button style={{...S.hmB, marginBottom:"12px"}} onClick={saveCard} disabled={!dataUrl}>⤓ Save Image</button>
+      <p style={S.hunterCardHint}>Post it anywhere — the card is a plain image, generated on your device.</p>
+    </div>
+  );
+}
+
+function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, ironXP, discXP, mindXP, strideXP, onBack, onBodyAlmanac, onInsights, onMonthlyChronicle, onTabNav, onHunterCard }) {
   const wk = weekKey(new Date());
   const sessionsThisWeek = history.filter(h => weekKey(h.date) === wk).length;
   const medsThisWeek = meditations.filter(m => weekKey(m.date) === wk).length;
@@ -3023,6 +3178,14 @@ function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, 
           </div>
           <span style={S.dArr}>▸</span>
         </button>
+        {onHunterCard && <button style={{...S.chronicleCard, background:"linear-gradient(135deg,rgba(196,169,106,0.1),rgba(232,203,140,0.04))", borderColor:"rgba(232,203,140,0.3)"}} onClick={onHunterCard}>
+          <span style={S.chronicleCardIcon}>✦</span>
+          <div style={{flex:1,textAlign:"left"}}>
+            <span style={S.chronicleCardTitle}>Hunter Card</span>
+            <span style={S.chronicleCardDesc}>Shareable status image · Post your ranks</span>
+          </div>
+          <span style={S.dArr}>▸</span>
+        </button>}
         <button style={S.chronicleCard} onClick={onInsights}>
           <span style={S.chronicleCardIcon}>📊</span>
           <div style={{flex:1,textAlign:"left"}}>
@@ -4999,4 +5162,9 @@ const S = {
   obNext:{width:"100%",padding:"15px",background:"linear-gradient(135deg,rgba(139,122,94,0.15),rgba(196,169,106,0.15))",border:"1px solid rgba(196,169,106,0.3)",borderRadius:"10px",color:"#c4a96a",fontFamily:"inherit",fontSize:"15px",letterSpacing:"3px",cursor:"pointer",textTransform:"uppercase"},
   obCTA:{width:"100%",maxWidth:"340px",padding:"16px",background:"linear-gradient(135deg,rgba(196,169,106,0.2),rgba(232,203,140,0.1))",border:"1px solid rgba(232,203,140,0.4)",borderRadius:"10px",color:"#e8cb8c",fontFamily:"inherit",fontSize:"16px",letterSpacing:"3px",cursor:"pointer",textTransform:"uppercase",marginTop:"10px"},
   obReplayLink:{width:"100%",padding:"10px",background:"none",border:"none",color:"#4a4236",fontFamily:"inherit",fontSize:"12px",letterSpacing:"2px",cursor:"pointer",marginTop:"14px"},
+  hunterStatusHeadRow:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"},
+  hunterCardBtn:{background:"none",border:"1px solid rgba(232,203,140,0.3)",color:"#e8cb8c",fontFamily:"inherit",fontSize:"11px",letterSpacing:"2px",padding:"4px 12px",borderRadius:"14px",cursor:"pointer",textTransform:"uppercase"},
+  hunterCardImg:{width:"100%",display:"block",borderRadius:"14px",border:"1px solid rgba(196,169,106,0.3)",marginBottom:"16px",boxShadow:"0 8px 40px rgba(0,0,0,0.5)"},
+  hunterCardLoading:{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"380px",color:"#8b7a5e",fontSize:"15px",letterSpacing:"3px",border:"1px dashed rgba(139,122,94,0.2)",borderRadius:"14px",marginBottom:"16px"},
+  hunterCardHint:{fontSize:"12px",color:"#4a4236",textAlign:"center",lineHeight:"1.6",marginBottom:"40px"},
 };
