@@ -578,7 +578,77 @@ const weekKey = (date) => { const d = new Date(date); const day = d.getDay(); co
 
 const sk = (user, k) => user ? `iron-grimoire:${user}:${k}` : `iron-grimoire:${k}`;
 async function load(user, key, fb) { try { const r = localStorage.getItem(sk(user,key)); return r !== null ? JSON.parse(r) : fb; } catch { return fb; } }
-async function save(user, key, v) { try { localStorage.setItem(sk(user,key), JSON.stringify(v)); } catch(e) { console.error(e); } }
+async function save(user, key, v) {
+  try { localStorage.setItem(sk(user,key), JSON.stringify(v)); }
+  catch(e) {
+    console.error(e);
+    // Surface the failure — silent data loss is unacceptable for a tracker.
+    try { window.dispatchEvent(new CustomEvent("grimoire:save-error", { detail: e?.name === "QuotaExceededError" ? "Device storage is full" : "Could not write to storage" })); } catch {}
+  }
+}
+
+// ─── Backup & restore ───
+// The backup file is the canonical serialized shape of one profile — the same
+// payload a future sync backend would store. Bump SCHEMA_VERSION when the
+// stored data shape changes, and add a step to migrateBackup.
+const SCHEMA_VERSION = 1;
+const BACKUP_KEYS = [
+  "history", "lastWeights", "prs", "ironXP", "discXP", "mindXP",
+  "habits", "habitLog", "meditations", "achievements",
+  "dailyQuests", "weeklyQuest", "questsCompleted", "ascensions", "customHabitsCreated",
+  "workouts", "medTypes", "medDurationPresets",
+  "bodyLog", "trackedMetrics", "logFrequency",
+  "runs", "strideXP", "activeProgram",
+  "books", "readingSessions", "loreXP",
+  "stallThreshold", "programs", "activeProgramId", "cycleState",
+  "lastMonthlyRecapSeen",
+];
+
+function buildBackupObject(name) {
+  const profiles = JSON.parse(localStorage.getItem(sk(null, "profiles")) || "[]");
+  const profile = profiles.find(p => p.name === name);
+  if (!profile) throw new Error(`No profile named "${name}".`);
+  const data = {};
+  BACKUP_KEYS.forEach(k => {
+    const raw = localStorage.getItem(sk(name, k));
+    if (raw !== null) { try { data[k] = JSON.parse(raw); } catch {} }
+  });
+  return {
+    app: "iron-grimoire",
+    schemaVersion: SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    profile: { name: profile.name, hash: profile.hash },
+    data,
+  };
+}
+
+function migrateBackup(b) {
+  // Future: while (v < SCHEMA_VERSION) { apply step; v++ }
+  return b;
+}
+
+function validateBackup(b) {
+  if (!b || b.app !== "iron-grimoire") throw new Error("Not an Iron Grimoire backup file.");
+  if ((b.schemaVersion || 1) > SCHEMA_VERSION) throw new Error("This backup is from a newer version of the app — update first.");
+  if (!b.profile?.name || !b.profile?.hash || typeof b.data !== "object") throw new Error("Backup file is incomplete or corrupted.");
+  return migrateBackup(b);
+}
+
+// Writes the backup into storage (upserts the profile entry + all data keys).
+// Caller is responsible for any overwrite confirmation.
+function applyBackupObject(b) {
+  const m = validateBackup(b);
+  const name = m.profile.name;
+  const profiles = JSON.parse(localStorage.getItem(sk(null, "profiles")) || "[]");
+  const idx = profiles.findIndex(p => p.name === name);
+  const entry = { name, hash: m.profile.hash };
+  if (idx >= 0) profiles[idx] = entry; else profiles.push(entry);
+  localStorage.setItem(sk(null, "profiles"), JSON.stringify(profiles));
+  Object.entries(m.data).forEach(([k, v]) => {
+    localStorage.setItem(sk(name, k), JSON.stringify(v));
+  });
+  return name;
+}
 
 // Play a synthesized gong sound — deep, resonant, self-contained
 let audioCtx = null;
@@ -1493,6 +1563,13 @@ export default function App() {
     await save(null, "onboardingSeen", true);
   };
 
+  // Console/data-portability seam: lets power users (and tests) export/apply
+  // backups directly — window.IronGrimoireVault.export("Name") / .apply(obj)
+  useEffect(() => {
+    window.IronGrimoireVault = { schemaVersion: SCHEMA_VERSION, export: buildBackupObject, apply: applyBackupObject };
+    return () => { delete window.IronGrimoireVault; };
+  }, []);
+
   // Load user data
   useEffect(() => { if (!user) return; (async () => {
     const [h, lw, pr, ix, dx, mx, hb, hl, md, ua, dq, wq, qc, asc, chc, cw, cmt, cmdp, bl, tm, lf, rn, sx, ap, bk, rs, lxp, st, savedProgs, savedActiveProg, savedCycle] = await Promise.all([
@@ -1545,6 +1622,7 @@ export default function App() {
     setPrograms(progs);
     setActiveProgramId(progs[savedActiveProg] ? savedActiveProg : "classic");
     setCycleState(savedCycle || {});
+    save(user, "schemaVersion", SCHEMA_VERSION);
     // Generate quests if needed
     refreshQuests(dq, wq);
     // Check for unseen monthly chronicle
@@ -1997,6 +2075,39 @@ export default function App() {
     return true;
   };
 
+  // ─── VAULT (backup & restore) ───
+  const exportBackup = () => {
+    try {
+      const b = buildBackupObject(user);
+      const blob = new Blob([JSON.stringify(b, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `iron-grimoire-${user.toLowerCase().replace(/\s+/g, "-")}-${todayKey()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) { alert(String(e?.message || e)); }
+  };
+  const importBackup = () => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "application/json,.json";
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      try {
+        const m = validateBackup(JSON.parse(await f.text()));
+        const name = m.profile.name;
+        const exists = profiles.find(p => p.name === name);
+        if (exists && !confirm(`Profile "${name}" already exists on this device. Overwrite its data with this backup${m.exportedAt ? ` from ${fmtDate(new Date(m.exportedAt))}` : ""}?`)) return;
+        applyBackupObject(m);
+        alert(`Restored "${name}". Sign in with the profile's original password.`);
+        location.reload();
+      } catch (e) { alert(String(e?.message || e)); }
+    };
+    inp.click();
+  };
+
   // ─── ASCENSION ───
   const ascend = async () => {
     if (!confirm("Ascend and reset all levels? You'll keep achievements and gain a permanent +10% XP multiplier.")) return;
@@ -2008,7 +2119,7 @@ export default function App() {
 
   if (loading) return <div style={S.loadScreen}><div style={S.loadText}>◆ Consulting the Iron Grimoire ◆</div></div>;
   if (!user && showOnboarding) return <OnboardingView onFinish={finishOnboarding}/>;
-  if (!user) return <LoginView key={loginInitialMode || "select"} profiles={profiles} onLogin={loginProfile} onCreate={createProfile} onDelete={deleteProfile} initialMode={loginInitialMode} onReplayOnboarding={()=>{setLoginInitialMode(null);setShowOnboarding(true);}}/>;
+  if (!user) return <LoginView key={loginInitialMode || "select"} profiles={profiles} onLogin={loginProfile} onCreate={createProfile} onDelete={deleteProfile} initialMode={loginInitialMode} onReplayOnboarding={()=>{setLoginInitialMode(null);setShowOnboarding(true);}} onRestore={importBackup}/>;
 
   const iron = getRank(ironXP, IRON_RANKS);
   const disc = getRank(discXP, DISC_RANKS);
@@ -2190,7 +2301,7 @@ export default function App() {
   // ═════════════════════════════════════════════════════
   // CHRONICLE (ANALYTICS + BODY ALMANAC)
   // ═════════════════════════════════════════════════════
-  if (view === "chronicle") return <ChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} onBack={()=>setView("home")} onBodyAlmanac={()=>setView("body-almanac")} onInsights={()=>setView("insights")} onMonthlyChronicle={()=>setView("monthly-chronicle")} onTabNav={(v)=>setView(v)} onHunterCard={()=>setView("hunter-card")}/>;
+  if (view === "chronicle") return <ChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} onBack={()=>setView("home")} onBodyAlmanac={()=>setView("body-almanac")} onInsights={()=>setView("insights")} onMonthlyChronicle={()=>setView("monthly-chronicle")} onTabNav={(v)=>setView(v)} onHunterCard={()=>setView("hunter-card")} onVault={()=>setView("vault")}/>;
 
   if (view === "hunter-card") {
     const cardPillars = [
@@ -2209,6 +2320,26 @@ export default function App() {
     ];
     return <HunterCardView user={user} pillars={cardPillars} streak={cardStreak} ascensions={ascensions} stats={cardStats} onBack={()=>setView("chronicle")}/>;
   }
+
+  if (view === "vault") return (
+    <div style={S.c}>
+      <AnimStyles/>
+      <div style={S.wH}><button style={S.bk} onClick={()=>setView("chronicle")}>‹</button><h2 style={S.wT}>⛃ The Vault</h2></div>
+      <p style={S.chronicleSubtitle}>Your grimoire, portable</p>
+      <div style={S.vaultCard}>
+        <span style={S.vaultCardTitle}>⤓ Download Backup</span>
+        <span style={S.vaultCardDesc}>{user} · {history.length} workouts · {meditations.length} meditations · {runs.length} runs · {books.length} books</span>
+        <span style={S.vaultCardDesc}>One JSON file containing this profile's complete grimoire (schema v{SCHEMA_VERSION}). Keep it safe, or carry it to a new device.</span>
+        <button style={{...S.finB, marginTop:"14px", marginBottom:0}} onClick={exportBackup}>⤓ Download Backup</button>
+      </div>
+      <div style={S.vaultCard}>
+        <span style={S.vaultCardTitle}>⤒ Restore from File</span>
+        <span style={S.vaultCardDesc}>Restores the profile contained in a backup file. If that profile already exists on this device, its data is overwritten after you confirm.</span>
+        <button style={{...S.hmB, marginTop:"14px", marginBottom:0}} onClick={importBackup}>⤒ Choose Backup File</button>
+      </div>
+      <p style={S.hunterCardHint}>Backups are plain JSON, created on your device. Nothing is uploaded anywhere.</p>
+    </div>
+  );
   if (view === "monthly-chronicle") return <MonthlyChronicleView history={history} meditations={meditations} habits={habits} habitLog={habitLog} bodyLog={bodyLog} runs={runs} ironXP={ironXP} discXP={discXP} mindXP={mindXP} strideXP={strideXP} unlockedAchievements={unlockedAchievements} user={user} onBack={()=>setView("chronicle")}/>;
   if (view === "insights") return <InsightsView history={history} meditations={meditations} habits={habits} habitLog={habitLog} ironXP={ironXP} discXP={discXP} mindXP={mindXP} onBack={()=>setView("chronicle")}/>;
   if (view === "body-almanac") return <BodyAlmanacView bodyLog={bodyLog} trackedMetrics={trackedMetrics} logFrequency={logFrequency} onBack={()=>setView("chronicle")} onLogNew={()=>setView("body-log")} onSettings={()=>setView("body-settings")}/>;
@@ -3142,7 +3273,7 @@ function HunterCardView({ user, pillars, streak, ascensions, stats, onBack }) {
   );
 }
 
-function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, ironXP, discXP, mindXP, strideXP, onBack, onBodyAlmanac, onInsights, onMonthlyChronicle, onTabNav, onHunterCard }) {
+function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, ironXP, discXP, mindXP, strideXP, onBack, onBodyAlmanac, onInsights, onMonthlyChronicle, onTabNav, onHunterCard, onVault }) {
   const wk = weekKey(new Date());
   const sessionsThisWeek = history.filter(h => weekKey(h.date) === wk).length;
   const medsThisWeek = meditations.filter(m => weekKey(m.date) === wk).length;
@@ -3202,6 +3333,14 @@ function ChronicleView({ history, meditations, habits, habitLog, bodyLog, runs, 
           </div>
           <span style={S.dArr}>▸</span>
         </button>
+        {onVault && <button style={S.chronicleCard} onClick={onVault}>
+          <span style={S.chronicleCardIcon}>⛃</span>
+          <div style={{flex:1,textAlign:"left"}}>
+            <span style={S.chronicleCardTitle}>The Vault</span>
+            <span style={S.chronicleCardDesc}>Backup & restore · Keep your grimoire safe</span>
+          </div>
+          <span style={S.dArr}>▸</span>
+        </button>}
       </div>
 
       <div style={S.sectionHead}>This Week</div>
@@ -4374,7 +4513,7 @@ function OnboardingView({ onFinish }) {
   );
 }
 
-function LoginView({ profiles, onLogin, onCreate, onDelete, initialMode, onReplayOnboarding }) {
+function LoginView({ profiles, onLogin, onCreate, onDelete, initialMode, onReplayOnboarding, onRestore }) {
   const [mode, setMode] = useState(initialMode || "select"); // select, login, create, delete
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [newName, setNewName] = useState("");
@@ -4422,7 +4561,8 @@ function LoginView({ profiles, onLogin, onCreate, onDelete, initialMode, onRepla
           {profiles.length===0&&<p style={S.emp}>No profiles yet. Create one below.</p>}
         </div>
         <button style={S.addHabitBtn} onClick={()=>{setMode("create");setError("");setNewName("");setPassword("");}}>+ New Profile</button>
-        {onReplayOnboarding && <button style={S.obReplayLink} onClick={onReplayOnboarding}>✦ About the Path</button>}
+        {onRestore && <button style={S.obReplayLink} onClick={onRestore}>⤒ Restore from Backup</button>}
+        {onReplayOnboarding && <button style={{...S.obReplayLink, marginTop:"2px"}} onClick={onReplayOnboarding}>✦ About the Path</button>}
       </>}
 
       {mode === "login" && <>
@@ -5167,4 +5307,7 @@ const S = {
   hunterCardImg:{width:"100%",display:"block",borderRadius:"14px",border:"1px solid rgba(196,169,106,0.3)",marginBottom:"16px",boxShadow:"0 8px 40px rgba(0,0,0,0.5)"},
   hunterCardLoading:{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"380px",color:"#8b7a5e",fontSize:"15px",letterSpacing:"3px",border:"1px dashed rgba(139,122,94,0.2)",borderRadius:"14px",marginBottom:"16px"},
   hunterCardHint:{fontSize:"12px",color:"#4a4236",textAlign:"center",lineHeight:"1.6",marginBottom:"40px"},
+  vaultCard:{display:"flex",flexDirection:"column",gap:"6px",padding:"16px",background:"rgba(139,122,94,0.05)",border:"1px solid rgba(139,122,94,0.15)",borderRadius:"12px",marginBottom:"14px"},
+  vaultCardTitle:{fontSize:"16px",color:"#e8dcc8",fontWeight:"600",letterSpacing:"1px"},
+  vaultCardDesc:{fontSize:"12px",color:"#8b7a5e",lineHeight:"1.6"},
 };
